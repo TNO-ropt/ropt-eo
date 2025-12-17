@@ -1,0 +1,5 @@
+**/__pycache__/**
+src/**egg-info/**
+src/ropt_eo/version.py
+uv.lock
+
