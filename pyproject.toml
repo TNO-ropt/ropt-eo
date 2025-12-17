@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ropt-eo"
+description = "An everest-optimizers plugin for ropt"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Natural Language :: English",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+requires-python = ">=3.11"
+dynamic = ["version"]
+dependencies = ["numpy", "everest-optimizers>=0.4"]
+
+[project.urls]
+"Homepage" = "https://github.com/TNO-ropt/ropt-eo"
+"Repository" = "https://github.com/TNO-ropt/ropt-eo"
+"Bug Tracker" = "https://github.com/TNO-ropt/ropt-eo/issues"
+
+[project.entry-points."ropt.plugins.optimizer"]
+everest_optimizers = "ropt_eo.everest_optimizers:EverestOptimizersPlugin"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+ropt_eo = ["py.typed"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ropt_eo.version.__version__" }
+
+[tool.setuptools_scm]
+write_to = "src/ropt_eo/version.py"
+
+[tool.pytest.ini_options]
+markers = ["external: external optimizer marker"]
+filterwarnings = [
+    "error",
+    'ignore:numpy.ndarray size changed, may indicate binary incompatibility.*:RuntimeWarning',
+]
+
+[tool.ruff.format]
+exclude = ["src/ropt_eo/version.py", "build"]
+
+[tool.ruff.lint]
+preview = true
+select = ["ALL"]
+ignore = [
+    "COM812", # missing-trailing-comma
+    "CPY",    # flake8-copyright
+    "E501",   # line-too-long
+    "S101",   # assert
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "D",       # pydocstyle
+    "ANN401",  # anytype
+    "PLC2701", # import-private-name
+    "PLR2004", # magic-value-comparison
+    "PLR0913", # too-many-arguments
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+strict = true
+
+[dependency-groups]
+dev = [
+    "mike",
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+    "mypy",
+    "pytest",
+    "ruff",
+]
