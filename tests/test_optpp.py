@@ -1,4 +1,3 @@
-import operator
 from typing import Any
 
 import numpy as np
@@ -162,7 +161,7 @@ def test_optpp_eq_nonlinear_constraint(
     }
     test_functions = (
         *test_functions,
-        lambda variables: variables[0] + variables[2],
+        lambda variables, _: variables[0] + variables[2],
     )
     optimizer = BasicOptimizer(enopt_config, evaluator(test_functions))
     optimizer.run(initial_values)
@@ -190,7 +189,7 @@ def test_optpp_ineq_nonlinear_constraint(
     weight = 1.0 if upper_bounds == 0.4 else -1.0
     test_functions = (
         *test_functions,
-        lambda variables: weight * variables[0] + weight * variables[2],
+        lambda variables, _: weight * variables[0] + weight * variables[2],
     )
     optimizer = BasicOptimizer(enopt_config, evaluator(test_functions))
     optimizer.run(initial_values)
@@ -214,8 +213,8 @@ def test_optpp_ineq_nonlinear_constraints_two_sided(
     }
     test_functions = (
         *test_functions,
-        operator.itemgetter(1),
-        lambda variables: variables[0] + variables[2],
+        lambda variables, _: variables[1],
+        lambda variables, _: variables[0] + variables[2],
     )
 
     optimizer = BasicOptimizer(enopt_config, evaluator(test_functions))
@@ -240,8 +239,8 @@ def test_optpp_ineq_nonlinear_constraints_eq_ineq(
     }
     test_functions = (
         *test_functions,
-        operator.itemgetter(1),
-        lambda variables: variables[0] + variables[2],
+        lambda variables, _: variables[1],
+        lambda variables, _: variables[0] + variables[2],
     )
 
     optimizer = BasicOptimizer(enopt_config, evaluator(test_functions))
@@ -255,10 +254,10 @@ def test_optpp_ineq_nonlinear_constraints_eq_ineq(
 def test_optpp_failed_realizations(enopt_config: Any, evaluator: Any) -> None:
     enopt_config["optimizer"]["method"] = "everest_optimizers/bcq_newton"
 
-    def func_p(_0: NDArray[np.float64]) -> float:
+    def func_p(_0: NDArray[np.float64], _1: int) -> float:
         return 1.0
 
-    def func_q(_0: NDArray[np.float64]) -> float:
+    def func_q(_0: NDArray[np.float64], _1: int) -> float:
         return np.nan
 
     functions = [func_p, func_q]
@@ -386,13 +385,13 @@ def test_optpp_objective_with_scaler(
     assert np.allclose(variables1, [0.0, 0.0, 0.5], atol=0.02)
     assert np.allclose(objectives1, [0.5, 4.5], atol=0.02)
 
-    def function1(variables: NDArray[np.float64]) -> float:
-        return float(test_functions[0](variables))
+    def function1(variables: NDArray[np.float64], _: int) -> float:
+        return float(test_functions[0](variables, 0))
 
-    def function2(variables: NDArray[np.float64]) -> float:
-        return float(test_functions[1](variables))
+    def function2(variables: NDArray[np.float64], _: int) -> float:
+        return float(test_functions[1](variables, 0))
 
-    init1 = test_functions[1](initial_values)
+    init1 = test_functions[1](initial_values, 0)
     transforms = OptModelTransforms(
         objectives=ObjectiveScaler(np.array([init1, init1]))
     )
@@ -444,14 +443,14 @@ def test_optpp_objective_with_lazy_scaler(
     objective_transform = ObjectiveScaler(np.array([1.0, 1.0]))
     transforms = OptModelTransforms(objectives=objective_transform)
 
-    init1 = test_functions[1](initial_values)
+    init1 = test_functions[1](initial_values, 0)
 
-    def function1(variables: NDArray[np.float64]) -> float:
+    def function1(variables: NDArray[np.float64], _: int) -> float:
         objective_transform.set_scales([init1, init1])
-        return float(test_functions[0](variables))
+        return float(test_functions[0](variables, 0))
 
-    def function2(variables: NDArray[np.float64]) -> float:
-        return float(test_functions[1](variables))
+    def function2(variables: NDArray[np.float64], _: int) -> float:
+        return float(test_functions[1](variables, 0))
 
     checked = False
 
@@ -522,7 +521,7 @@ def test_optpp_nonlinear_constraint_with_scaler(
 
     functions = (
         *test_functions,
-        lambda variables: variables[0] + variables[2],
+        lambda variables, _: variables[0] + variables[2],
     )
 
     optimizer1 = BasicOptimizer(enopt_config, evaluator(functions))
@@ -531,7 +530,7 @@ def test_optpp_nonlinear_constraint_with_scaler(
     assert optimizer1.results.evaluations.variables[[0, 2]].sum() > 0.0 - 1e-5
     assert optimizer1.results.evaluations.variables[[0, 2]].sum() < 0.4 + 1e-5
 
-    scales = np.array(functions[-1](initial_values), ndmin=1)
+    scales = np.array(functions[-1](initial_values, 0), ndmin=1)
     transforms = OptModelTransforms(nonlinear_constraints=ConstraintScaler(scales))
     config = EnOptConfig.model_validate(enopt_config, context=transforms)
     assert config.nonlinear_constraints is not None
@@ -595,7 +594,7 @@ def test_optpp_nonlinear_constraint_with_lazy_scaler(
 
     functions = (
         *test_functions,
-        lambda variables: variables[0] + variables[2],
+        lambda variables, _: variables[0] + variables[2],
     )
 
     optimizer1 = BasicOptimizer(enopt_config, evaluator(functions))
@@ -604,7 +603,7 @@ def test_optpp_nonlinear_constraint_with_lazy_scaler(
     assert optimizer1.results.evaluations.variables[[0, 2]].sum() > 0.0 - 1e-5
     assert optimizer1.results.evaluations.variables[[0, 2]].sum() < 0.4 + 1e-5
 
-    scales = np.array(functions[-1](initial_values), ndmin=1)
+    scales = np.array(functions[-1](initial_values, 0), ndmin=1)
     scaler = ConstraintScaler([1.0])
     transforms = OptModelTransforms(nonlinear_constraints=scaler)
 
@@ -618,7 +617,7 @@ def test_optpp_nonlinear_constraint_with_lazy_scaler(
     )
     assert bounds[1] == 0.4
 
-    def constraint_function(variables: NDArray[np.float64]) -> float:
+    def constraint_function(variables: NDArray[np.float64], _: int) -> float:
         scaler.set_scales(scales)
         return float(variables[0] + variables[2])
 
