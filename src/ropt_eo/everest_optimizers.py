@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
 import numpy as np
 from everest_optimizers import minimize  # type: ignore[import-untyped]
-from numpy.typing import NDArray
 from ropt.config.options import OptionsSchemaModel
 from ropt.plugins.optimizer.base import Optimizer, OptimizerPlugin
 from ropt.plugins.optimizer.utils import (
@@ -20,6 +18,7 @@ from ropt.plugins.optimizer.utils import (
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
+    from numpy.typing import NDArray
     from ropt.config import EnOptConfig
     from ropt.optimization import OptimizerCallback
 
@@ -35,8 +34,6 @@ _CONSTRAINT_SUPPORT_LINEAR_EQ: Final = {"q_nips"}
 _CONSTRAINT_SUPPORT_LINEAR_INEQ: Final = {"q_nips"}
 _CONSTRAINT_SUPPORT_NONLINEAR_EQ: Final = {"q_nips"}
 _CONSTRAINT_SUPPORT_NONLINEAR_INEQ: Final = {"q_nips"}
-
-_ConstraintType = str | Callable[..., float] | Callable[..., NDArray[np.float64]]
 
 _METHOD_MAP: Final = {
     "q_newton": "optpp_q_newton",
@@ -418,7 +415,7 @@ _DEFAULT_OPTIONS: dict[str, Any] = {
     "output_file": str,
     "search_method": Literal["line_search", "trust_region", "trust_pds"],
     "search_pattern_size": int,
-    "max_step": int,
+    "max_step": float,
     "gradient_multiplier": float,
     "max_iterations": int,
     "max_function_evaluations": int,
