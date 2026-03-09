@@ -7,10 +7,11 @@ import pytest
 from numpy.typing import ArrayLike, NDArray
 from ropt.config import EnOptConfig
 from ropt.enums import EventType, ExitCode
+from ropt.optimization import Event
 from ropt.results import FunctionResults, GradientResults, Results
 from ropt.transforms import OptModelTransforms
 from ropt.transforms.base import NonLinearConstraintTransform, ObjectiveTransform
-from ropt.workflow import BasicOptimizer, Event
+from ropt.workflow import BasicOptimizer
 
 initial_values = [0.0, 0.0, 0.1]
 
