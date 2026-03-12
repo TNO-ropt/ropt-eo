@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from numpy.typing import ArrayLike, NDArray
 from ropt.config import EnOptConfig
-from ropt.enums import EventType, ExitCode
-from ropt.optimization import Event
+from ropt.enums import EnOptEventType, ExitCode
+from ropt.events import EnOptEvent
 from ropt.results import FunctionResults, GradientResults, Results
 from ropt.transforms import OptModelTransforms
 from ropt.transforms.base import NonLinearConstraintTransform, ObjectiveTransform
@@ -322,7 +322,7 @@ def test_optpp_optimizer_variables_subset(enopt_config: Any, evaluator: Any) -> 
         for item in results:
             if isinstance(item, GradientResults):
                 assert item.gradients is not None
-                assert item.gradients.weighted_objective[1] == 0.0
+                assert item.gradients.target_objective[1] == 0.0
                 assert np.all(np.equal(item.gradients.objectives[:, 1], 0.0))
 
     optimizer = BasicOptimizer(enopt_config, evaluator())
@@ -401,18 +401,15 @@ def test_optpp_objective_with_scaler(
 
     checked = False
 
-    def check_value(event: Event) -> None:
+    def check_value(event: EnOptEvent) -> None:
         nonlocal checked
-        results = event.data.get("results", ())
-        for item in results:
+        for item in event.results:
             if isinstance(item, FunctionResults) and not checked:
                 checked = True
                 assert item.functions is not None
                 assert item.functions.objectives is not None
                 assert np.allclose(item.functions.objectives[-1], 1.0)
-                transformed = item.transform_from_optimizer(
-                    event.data["config"], event.data["transforms"]
-                )
+                transformed = item.transform_from_optimizer(event.config)
                 assert transformed.functions is not None
                 assert transformed.functions.objectives is not None
                 assert np.allclose(transformed.functions.objectives[-1], init1)
@@ -421,7 +418,7 @@ def test_optpp_objective_with_scaler(
         enopt_config, evaluator([function1, function2]), transforms=transforms
     )
     optimizer2._observers.append(  # noqa: SLF001
-        (EventType.FINISHED_EVALUATION, check_value)
+        (EnOptEventType.FINISHED_EVALUATION, check_value)
     )
     optimizer2.run(initial_values)
     assert optimizer2.results is not None
@@ -457,18 +454,15 @@ def test_optpp_objective_with_lazy_scaler(
 
     checked = False
 
-    def check_value(event: Event) -> None:
+    def check_value(event: EnOptEvent) -> None:
         nonlocal checked
-        results = event.data.get("results", ())
-        for item in results:
+        for item in event.results:
             if isinstance(item, FunctionResults) and not checked:
                 checked = True
                 assert item.functions is not None
                 assert item.functions.objectives is not None
                 assert np.allclose(item.functions.objectives[-1], 1.0)
-                transformed = item.transform_from_optimizer(
-                    event.data["config"], event.data["transforms"]
-                )
+                transformed = item.transform_from_optimizer(event.config)
                 assert transformed.functions is not None
                 assert transformed.functions.objectives is not None
                 assert np.allclose(transformed.functions.objectives[-1], init1)
@@ -477,7 +471,7 @@ def test_optpp_objective_with_lazy_scaler(
         enopt_config, evaluator([function1, function2]), transforms=transforms
     )
     optimizer2._observers.append(  # noqa: SLF001
-        (EventType.FINISHED_EVALUATION, check_value)
+        (EnOptEventType.FINISHED_EVALUATION, check_value)
     )
     optimizer2.run(initial_values)
     assert optimizer2.results is not None
@@ -548,18 +542,15 @@ def test_optpp_nonlinear_constraint_with_scaler(
 
     check = True
 
-    def check_constraints(event: Event) -> None:
+    def check_constraints(event: EnOptEvent) -> None:
         nonlocal check
-        results = event.data.get("results", ())
-        for item in results:
+        for item in event.results:
             if isinstance(item, FunctionResults) and check:
                 check = False
                 assert item.functions is not None
                 assert item.functions.constraints is not None
                 assert np.allclose(item.functions.constraints, 1.0)
-                transformed = item.transform_from_optimizer(
-                    event.data["config"], event.data["transforms"]
-                )
+                transformed = item.transform_from_optimizer(event.config)
                 assert transformed.functions is not None
                 assert transformed.functions.constraints is not None
                 assert np.allclose(transformed.functions.constraints, scales)
@@ -568,7 +559,7 @@ def test_optpp_nonlinear_constraint_with_scaler(
         enopt_config, evaluator(functions), transforms=transforms
     )
     optimizer2._observers.append(  # noqa: SLF001
-        (EventType.FINISHED_EVALUATION, check_constraints)
+        (EnOptEventType.FINISHED_EVALUATION, check_constraints)
     )
     optimizer2.run(initial_values)
     assert optimizer2.results is not None
@@ -628,26 +619,22 @@ def test_optpp_nonlinear_constraint_with_lazy_scaler(
 
     check = True
 
-    def check_constraints(event: Event) -> None:
+    def check_constraints(event: EnOptEvent) -> None:
         nonlocal check
-        results = event.data.get("results", ())
-        config = event.data["config"]
-        for item in results:
+        for item in event.results:
             if isinstance(item, FunctionResults) and check:
                 check = False
-                assert config.nonlinear_constraints is not None
+                assert event.config.nonlinear_constraints is not None
                 assert transforms.nonlinear_constraints is not None
                 _, upper_bounds = transforms.nonlinear_constraints.bounds_to_optimizer(
-                    config.nonlinear_constraints.lower_bounds,
-                    config.nonlinear_constraints.upper_bounds,
+                    event.config.nonlinear_constraints.lower_bounds,
+                    event.config.nonlinear_constraints.upper_bounds,
                 )
                 assert np.allclose(upper_bounds, 0.4 / scales)
                 assert item.functions is not None
                 assert item.functions.constraints is not None
                 assert np.allclose(item.functions.constraints, 1.0)
-                transformed = item.transform_from_optimizer(
-                    event.data["config"], event.data["transforms"]
-                )
+                transformed = item.transform_from_optimizer(event.config)
                 assert transformed.functions is not None
                 assert transformed.functions.constraints is not None
                 assert np.allclose(transformed.functions.constraints, scales)
@@ -656,7 +643,7 @@ def test_optpp_nonlinear_constraint_with_lazy_scaler(
         enopt_config, evaluator(functions), transforms=transforms
     )
     optimizer2._observers.append(  # noqa: SLF001
-        (EventType.FINISHED_EVALUATION, check_constraints)
+        (EnOptEventType.FINISHED_EVALUATION, check_constraints)
     )
     optimizer2.run(initial_values)
     assert optimizer2.results is not None

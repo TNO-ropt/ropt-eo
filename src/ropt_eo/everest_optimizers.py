@@ -20,7 +20,7 @@ from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 if TYPE_CHECKING:
     from numpy.typing import NDArray
     from ropt.config import EnOptConfig
-    from ropt.optimization import OptimizerCallback
+    from ropt.core import OptimizerCallback
 
 _SUPPORTED_METHODS: Final[set[str]] = {"q_newton", "bcq_newton", "q_nips"}
 _DEFAULT_METHOD: Final = "q_nips"
