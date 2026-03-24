@@ -9,12 +9,13 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 import numpy as np
 from everest_optimizers import minimize  # type: ignore[import-untyped]
 from ropt.config.options import OptionsSchemaModel
-from ropt.plugins.optimizer.base import Optimizer, OptimizerPlugin
-from ropt.plugins.optimizer.utils import (
+from ropt.optimizer import Optimizer
+from ropt.optimizer.utils import (
     NormalizedConstraints,
     get_masked_linear_constraints,
     validate_supported_constraints,
 )
+from ropt.plugins.optimizer import OptimizerPlugin
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
@@ -78,7 +79,7 @@ class EverestOptimizers(Optimizer):
     ) -> None:
         """Initialize the optimizer implemented by the Optpp plugin.
 
-        See the [ropt.plugins.optimizer.base.Optimizer][] abstract base class.
+        See the [ropt.optimizer.Optimizer][] abstract base class.
 
         # noqa
         """
@@ -104,7 +105,7 @@ class EverestOptimizers(Optimizer):
     def start(self, initial_values: NDArray[np.float64]) -> None:
         """Start the optimization.
 
-        See the [ropt.plugins.optimizer.base.Optimizer][] abstract base class.
+        See the [ropt.optimizer.Optimizer][] abstract base class.
 
         # noqa
         """
@@ -374,7 +375,7 @@ class EverestOptimizersPlugin(OptimizerPlugin):
     ) -> EverestOptimizers:
         """Initialize the optimizer plugin.
 
-        See the [ropt.plugins.optimizer.base.OptimizerPlugin][] abstract base class.
+        See the [ropt.plugins.optimizer.OptimizerPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC201
@@ -384,7 +385,7 @@ class EverestOptimizersPlugin(OptimizerPlugin):
     def is_supported(cls, method: str) -> bool:
         """Check if a method is supported.
 
-        See the [ropt.plugins.optimizer.base.OptimizerPlugin][] abstract base class.
+        See the [ropt.plugins.optimizer.OptimizerPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC201
@@ -396,7 +397,7 @@ class EverestOptimizersPlugin(OptimizerPlugin):
     ) -> None:
         """Validate the options of a given method.
 
-        See the [ropt.plugins.optimizer.base.OptimizerPlugin][] abstract base class.
+        See the [ropt.plugins.optimizer.OptimizerPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC501
