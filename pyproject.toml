@@ -25,7 +25,7 @@ dependencies = ["numpy", "everest-optimizers>=0.4"]
 "Repository" = "https://github.com/TNO-ropt/ropt-eo"
 "Bug Tracker" = "https://github.com/TNO-ropt/ropt-eo/issues"
 
-[project.entry-points."ropt.plugins.optimizer"]
+[project.entry-points."ropt.plugins.backend"]
 everest_optimizers = "ropt_eo.everest_optimizers:EverestOptimizersPlugin"
 
 [tool.setuptools.packages.find]

@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
 import numpy as np
 from everest_optimizers import minimize  # type: ignore[import-untyped]
-from ropt.config.options import OptionsSchemaModel
-from ropt.optimizer import Optimizer
-from ropt.optimizer.utils import (
+from ropt.backend import Backend
+from ropt.backend.utils import (
     NormalizedConstraints,
     get_masked_linear_constraints,
     validate_supported_constraints,
 )
-from ropt.plugins.optimizer import OptimizerPlugin
+from ropt.config.options import OptionsSchemaModel
+from ropt.plugins.backend import BackendPlugin
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
@@ -43,19 +43,19 @@ _METHOD_MAP: Final = {
 }
 
 
-class EverestOptimizers(Optimizer):
+class EverestOptimizers(Backend):
     """OPT++ optimization backend for ropt.
 
     This class provides an interface to several optimization algorithms from
     the OPT++ library, enabling their use within `ropt`.
 
     To select an optimizer, set the `method` field within the
-    [`optimizer`][ropt.config.OptimizerConfig] section of the
+    [`optimizer`][ropt.config.BackendConfig] section of the
     [`EnOptConfig`][ropt.config.EnOptConfig] configuration object to the desired
     algorithm's name. Most methods support the general options defined in the
     [`EnOptConfig`][ropt.config.EnOptConfig] object. For algorithm-specific
     options, use the `options` dictionary within the
-    [`optimizer`][ropt.config.OptimizerConfig] section.
+    [`optimizer`][ropt.config.BackendConfig] section.
 
     The table below lists the included methods together with the method-specific
     options that are supported:
@@ -79,13 +79,13 @@ class EverestOptimizers(Optimizer):
     ) -> None:
         """Initialize the optimizer implemented by the Optpp plugin.
 
-        See the [ropt.optimizer.Optimizer][] abstract base class.
+        See the [ropt.backend.Backend][] abstract base class.
 
         # noqa
         """
         self._optimizer_callback = optimizer_callback
         self._config = config
-        _, _, self._method = self._config.optimizer.method.lower().rpartition("/")
+        _, _, self._method = self._config.backend.method.lower().rpartition("/")
         if self._method == "default":
             self._method = _DEFAULT_METHOD
         if self._method not in _SUPPORTED_METHODS:
@@ -105,7 +105,7 @@ class EverestOptimizers(Optimizer):
     def start(self, initial_values: NDArray[np.float64]) -> None:
         """Start the optimization.
 
-        See the [ropt.optimizer.Optimizer][] abstract base class.
+        See the [ropt.backend.Backend][] abstract base class.
 
         # noqa
         """
@@ -341,16 +341,16 @@ class EverestOptimizers(Optimizer):
 
     def _parse_options(self) -> dict[str, Any]:
         options = (
-            copy.deepcopy(self._config.optimizer.options)
-            if isinstance(self._config.optimizer.options, dict)
+            copy.deepcopy(self._config.backend.options)
+            if isinstance(self._config.backend.options, dict)
             else {}
         )
-        if self._config.optimizer.max_iterations is not None:
-            options["max_iterations"] = self._config.optimizer.max_iterations
-        if self._config.optimizer.max_functions is not None:
-            options["max_function_evaluations"] = self._config.optimizer.max_functions
-        if self._config.optimizer.tolerance is not None:
-            options["convergence_tolerance"] = self._config.optimizer.tolerance
+        if self._config.backend.max_iterations is not None:
+            options["max_iterations"] = self._config.backend.max_iterations
+        if self._config.backend.max_functions is not None:
+            options["max_function_evaluations"] = self._config.backend.max_functions
+        if self._config.backend.tolerance is not None:
+            options["convergence_tolerance"] = self._config.backend.tolerance
         return options
 
 
@@ -366,7 +366,7 @@ def _get_constraint_bounds(
     return None
 
 
-class EverestOptimizersPlugin(OptimizerPlugin):
+class EverestOptimizersPlugin(BackendPlugin):
     """The OPT++ optimizer plugin class."""
 
     @classmethod
@@ -375,7 +375,7 @@ class EverestOptimizersPlugin(OptimizerPlugin):
     ) -> EverestOptimizers:
         """Initialize the optimizer plugin.
 
-        See the [ropt.plugins.optimizer.OptimizerPlugin][] abstract base class.
+        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC201
@@ -385,7 +385,7 @@ class EverestOptimizersPlugin(OptimizerPlugin):
     def is_supported(cls, method: str) -> bool:
         """Check if a method is supported.
 
-        See the [ropt.plugins.optimizer.OptimizerPlugin][] abstract base class.
+        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC201
@@ -397,7 +397,7 @@ class EverestOptimizersPlugin(OptimizerPlugin):
     ) -> None:
         """Validate the options of a given method.
 
-        See the [ropt.plugins.optimizer.OptimizerPlugin][] abstract base class.
+        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC501

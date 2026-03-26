@@ -21,7 +21,7 @@ def enopt_config_fixture() -> dict[str, Any]:
             "lower_bounds": [-1.0] * 3,
             "upper_bounds": [1.0] * 3,
         },
-        "optimizer": {
+        "backend": {
             "method": "update_this_in_the_test",
             "tolerance": 1e-6,
         },
@@ -35,7 +35,7 @@ def enopt_config_fixture() -> dict[str, Any]:
     "external", ["", pytest.param("external/", marks=pytest.mark.external)]
 )
 def test_optpp_unconstrained(enopt_config: Any, evaluator: Any, external: str) -> None:
-    enopt_config["optimizer"]["method"] = f"{external}q_newton"
+    enopt_config["backend"]["method"] = f"{external}q_newton"
     enopt_config["variables"]["lower_bounds"] = -np.inf
     enopt_config["variables"]["upper_bounds"] = np.inf
     optimizer = BasicOptimizer(enopt_config, evaluator())
@@ -48,7 +48,7 @@ def test_optpp_unconstrained(enopt_config: Any, evaluator: Any, external: str) -
 
 @pytest.mark.parametrize("method", ["bcq_newton", "q_nips"])
 def test_optpp_bound_constraint(enopt_config: Any, method: str, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = f"everest_optimizers/{method}"
+    enopt_config["backend"]["method"] = f"everest_optimizers/{method}"
     enopt_config["variables"]["lower_bounds"] = -1.0
     enopt_config["variables"]["upper_bounds"] = [1.0, 1.0, 0.2]
     optimizer = BasicOptimizer(enopt_config, evaluator())
@@ -60,7 +60,7 @@ def test_optpp_bound_constraint(enopt_config: Any, method: str, evaluator: Any) 
 
 
 def test_optpp_eq_linear_constraint(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["linear_constraints"] = {
         "coefficients": [[1, 0, 1], [0, 1, 1]],
         "lower_bounds": [1.0, 0.75],
@@ -75,7 +75,7 @@ def test_optpp_eq_linear_constraint(enopt_config: Any, evaluator: Any) -> None:
 
 
 def test_optpp_ge_linear_constraint(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["linear_constraints"] = {
         "coefficients": [[-1, 0, -1]],
         "lower_bounds": -0.4,
@@ -90,7 +90,7 @@ def test_optpp_ge_linear_constraint(enopt_config: Any, evaluator: Any) -> None:
 
 
 def test_optpp_le_linear_constraint(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["linear_constraints"] = {
         "coefficients": [[1, 0, 1]],
         "lower_bounds": -np.inf,
@@ -105,7 +105,7 @@ def test_optpp_le_linear_constraint(enopt_config: Any, evaluator: Any) -> None:
 
 
 def test_optpp_le_ge_linear_constraints(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["linear_constraints"] = {
         "coefficients": [[1, 0, 1], [-1, 0, -1]],
         "lower_bounds": [-np.inf, -0.4],
@@ -122,7 +122,7 @@ def test_optpp_le_ge_linear_constraints(enopt_config: Any, evaluator: Any) -> No
 def test_optpp_le_ge_linear_constraints_two_sided(
     enopt_config: Any, evaluator: Any
 ) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["linear_constraints"] = {
         "coefficients": [[1, 0, 1], [1, 0, 1]],
         "lower_bounds": [-np.inf, 0.0],
@@ -153,7 +153,7 @@ def test_optpp_le_ge_linear_constraints_two_sided(
 def test_optpp_eq_nonlinear_constraint(
     enopt_config: Any, evaluator: Any, test_functions: Any
 ) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["nonlinear_constraints"] = {
         "lower_bounds": 1.0,
         "upper_bounds": 1.0,
@@ -180,7 +180,7 @@ def test_optpp_ineq_nonlinear_constraint(
     evaluator: Any,
     test_functions: Any,
 ) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["nonlinear_constraints"] = {
         "lower_bounds": lower_bounds,
         "upper_bounds": upper_bounds,
@@ -203,7 +203,7 @@ def test_optpp_ineq_nonlinear_constraints_two_sided(
     evaluator: Any,
     test_functions: Any,
 ) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["variables"]["lower_bounds"] = [-1.0, -1.0, -1.0]
     enopt_config["variables"]["upper_bounds"] = [1.0, 1.0, 1.0]
     enopt_config["nonlinear_constraints"] = {
@@ -229,7 +229,7 @@ def test_optpp_ineq_nonlinear_constraints_eq_ineq(
     evaluator: Any,
     test_functions: Any,
 ) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["variables"]["lower_bounds"] = [-1.0, -1.0, -1.0]
     enopt_config["variables"]["upper_bounds"] = [1.0, 1.0, 1.0]
     enopt_config["nonlinear_constraints"] = {
@@ -251,7 +251,7 @@ def test_optpp_ineq_nonlinear_constraints_eq_ineq(
 
 
 def test_optpp_failed_realizations(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/bcq_newton"
+    enopt_config["backend"]["method"] = "everest_optimizers/bcq_newton"
 
     def func_p(_0: NDArray[np.float64], _1: int) -> float:
         return 1.0
@@ -267,7 +267,7 @@ def test_optpp_failed_realizations(enopt_config: Any, evaluator: Any) -> None:
 
 
 def test_optpp_user_abort(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/bcq_newton"
+    enopt_config["backend"]["method"] = "everest_optimizers/bcq_newton"
     last_evaluation = 0
 
     def _abort() -> bool:
@@ -287,7 +287,7 @@ def test_optpp_user_abort(enopt_config: Any, evaluator: Any) -> None:
 
 
 def test_optpp_evaluation_policy_separate(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/bcq_newton"
+    enopt_config["backend"]["method"] = "everest_optimizers/bcq_newton"
     enopt_config["gradient"] = {"evaluation_policy": "separate"}
     optimizer = BasicOptimizer(enopt_config, evaluator())
     optimizer.run(initial_values)
@@ -306,7 +306,7 @@ def test_optpp_evaluation_policy_separate(enopt_config: Any, evaluator: Any) -> 
 
 
 def test_optpp_optimizer_variables_subset(enopt_config: Any, evaluator: Any) -> None:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/bcq_newton"
+    enopt_config["backend"]["method"] = "everest_optimizers/bcq_newton"
     enopt_config["variables"]["lower_bounds"] = -1.0
     enopt_config["variables"]["upper_bounds"] = 1.0
 
@@ -337,7 +337,7 @@ def test_optpp_optimizer_variables_subset_linear_constraints(
     # optimization of the other variables in this particular test problem: The
     # second and third constraints are dropped because they involve variables
     # that are not optimized. They are still checked by the monitor:
-    enopt_config["optimizer"]["method"] = "everest_optimizers/q_nips"
+    enopt_config["backend"]["method"] = "everest_optimizers/q_nips"
     enopt_config["linear_constraints"] = {
         "coefficients": [[1, 0, 1], [0, 1, 0], [1, 1, 1]],
         "lower_bounds": [1.0, 1.0, 2.0],
