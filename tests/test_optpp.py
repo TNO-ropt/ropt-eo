@@ -23,7 +23,7 @@ def enopt_config_fixture() -> dict[str, Any]:
         },
         "backend": {
             "method": "update_this_in_the_test",
-            "tolerance": 1e-6,
+            "convergence_tolerance": 1e-6,
         },
         "objectives": {
             "weights": [0.75, 0.25],

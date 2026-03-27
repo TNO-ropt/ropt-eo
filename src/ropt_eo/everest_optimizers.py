@@ -347,10 +347,10 @@ class EverestOptimizers(Backend):
         )
         if self._config.backend.max_iterations is not None:
             options["max_iterations"] = self._config.backend.max_iterations
-        if self._config.backend.max_functions is not None:
-            options["max_function_evaluations"] = self._config.backend.max_functions
-        if self._config.backend.tolerance is not None:
-            options["convergence_tolerance"] = self._config.backend.tolerance
+        if self._config.backend.convergence_tolerance is not None:
+            options["convergence_tolerance"] = (
+                self._config.backend.convergence_tolerance
+            )
         return options
 
 
