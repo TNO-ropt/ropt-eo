@@ -20,7 +20,7 @@ from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
-    from ropt.config import EnOptConfig
+    from ropt.context import EnOptContext
     from ropt.core import OptimizerCallback
 
 _SUPPORTED_METHODS: Final[set[str]] = {"q_newton", "bcq_newton", "q_nips"}
@@ -51,9 +51,9 @@ class EverestOptimizers(Backend):
 
     To select an optimizer, set the `method` field within the
     [`optimizer`][ropt.config.BackendConfig] section of the
-    [`EnOptConfig`][ropt.config.EnOptConfig] configuration object to the desired
+    [`EnOptContext`][ropt.context.EnOptContext] configuration object to the desired
     algorithm's name. Most methods support the general options defined in the
-    [`EnOptConfig`][ropt.config.EnOptConfig] object. For algorithm-specific
+    [`EnOptContext`][ropt.context.EnOptContext] object. For algorithm-specific
     options, use the `options` dictionary within the
     [`optimizer`][ropt.config.BackendConfig] section.
 
@@ -75,7 +75,7 @@ class EverestOptimizers(Backend):
     }
 
     def __init__(
-        self, config: EnOptConfig, optimizer_callback: OptimizerCallback
+        self, context: EnOptContext, optimizer_callback: OptimizerCallback
     ) -> None:
         """Initialize the optimizer implemented by the Optpp plugin.
 
@@ -84,15 +84,15 @@ class EverestOptimizers(Backend):
         # noqa
         """
         self._optimizer_callback = optimizer_callback
-        self._config = config
-        _, _, self._method = self._config.backend.method.lower().rpartition("/")
+        self._context = context
+        _, _, self._method = self._context.backend.method.lower().rpartition("/")
         if self._method == "default":
             self._method = _DEFAULT_METHOD
         if self._method not in _SUPPORTED_METHODS:
             msg = f"OPT++ optimizer algorithm {self._method} is not supported"
             raise NotImplementedError(msg)
         validate_supported_constraints(
-            self._config,
+            self._context,
             self._method,
             self._supported_constraints,
             self._required_constraints,
@@ -118,7 +118,7 @@ class EverestOptimizers(Backend):
 
         minimize(
             fun=self._function,
-            x0=initial_values[self._config.variables.mask],
+            x0=initial_values[self._context.variables.mask],
             method=_METHOD_MAP[self._method],
             bounds=self._bounds,
             jac=self._gradient,
@@ -128,14 +128,14 @@ class EverestOptimizers(Backend):
 
     def _initialize_bounds(self) -> Bounds | None:
         if (
-            np.isfinite(self._config.variables.lower_bounds).any()
-            or np.isfinite(self._config.variables.upper_bounds).any()
+            np.isfinite(self._context.variables.lower_bounds).any()
+            or np.isfinite(self._context.variables.upper_bounds).any()
         ):
-            lower_bounds = self._config.variables.lower_bounds[
-                self._config.variables.mask
+            lower_bounds = self._context.variables.lower_bounds[
+                self._context.variables.mask
             ]
-            upper_bounds = self._config.variables.upper_bounds[
-                self._config.variables.mask
+            upper_bounds = self._context.variables.upper_bounds[
+                self._context.variables.mask
             ]
             return Bounds(lower_bounds, upper_bounds)
         return None
@@ -149,17 +149,17 @@ class EverestOptimizers(Backend):
         self._linear_constraint_bounds: (
             tuple[NDArray[np.float64], NDArray[np.float64]] | None
         ) = None
-        if self._config.linear_constraints is not None:
+        if self._context.linear_constraints is not None:
             lin_coef, lin_lower, lin_upper = get_masked_linear_constraints(
-                self._config, initial_values
+                self._context, initial_values
             )
             self._linear_constraint_bounds = (lin_lower, lin_upper)
         nonlinear_bounds = (
             None
-            if self._config.nonlinear_constraints is None
+            if self._context.nonlinear_constraints is None
             else (
-                self._config.nonlinear_constraints.lower_bounds,
-                self._config.nonlinear_constraints.upper_bounds,
+                self._context.nonlinear_constraints.lower_bounds,
+                self._context.nonlinear_constraints.upper_bounds,
             )
         )
         if (bounds := _get_constraint_bounds(nonlinear_bounds)) is not None:
@@ -193,7 +193,7 @@ class EverestOptimizers(Backend):
         lin_upper: NDArray[np.float64] | None,
     ) -> list[LinearConstraint | NonlinearConstraint]:
         constraints: list[LinearConstraint | NonlinearConstraint] = []
-        if self._config.linear_constraints is not None:
+        if self._context.linear_constraints is not None:
             assert lin_coef is not None
             assert lin_lower is not None
             assert lin_upper is not None
@@ -270,7 +270,7 @@ class EverestOptimizers(Backend):
 
         if compute_functions or compute_gradients:
             self._cached_variables = variables.copy()
-            speculative = self._config.gradient.evaluation_policy == "speculative"
+            speculative = self._context.gradient.evaluation_policy == "speculative"
             compute_functions = compute_functions or speculative
             compute_gradients = compute_gradients or speculative
             new_function, new_gradient = self._compute_functions_and_gradients(
@@ -303,7 +303,7 @@ class EverestOptimizers(Backend):
         if (
             compute_functions
             and compute_gradients
-            and self._config.gradient.evaluation_policy == "separate"
+            and self._context.gradient.evaluation_policy == "separate"
         ):
             callback_result = self._optimizer_callback(
                 variables,
@@ -341,15 +341,15 @@ class EverestOptimizers(Backend):
 
     def _parse_options(self) -> dict[str, Any]:
         options = (
-            copy.deepcopy(self._config.backend.options)
-            if isinstance(self._config.backend.options, dict)
+            copy.deepcopy(self._context.backend.options)
+            if isinstance(self._context.backend.options, dict)
             else {}
         )
-        if self._config.backend.max_iterations is not None:
-            options["max_iterations"] = self._config.backend.max_iterations
-        if self._config.backend.convergence_tolerance is not None:
+        if self._context.backend.max_iterations is not None:
+            options["max_iterations"] = self._context.backend.max_iterations
+        if self._context.backend.convergence_tolerance is not None:
             options["convergence_tolerance"] = (
-                self._config.backend.convergence_tolerance
+                self._context.backend.convergence_tolerance
             )
         return options
 
@@ -371,7 +371,7 @@ class EverestOptimizersPlugin(BackendPlugin):
 
     @classmethod
     def create(
-        cls, config: EnOptConfig, optimizer_callback: OptimizerCallback
+        cls, context: EnOptContext, optimizer_callback: OptimizerCallback
     ) -> EverestOptimizers:
         """Initialize the optimizer plugin.
 
@@ -379,7 +379,7 @@ class EverestOptimizersPlugin(BackendPlugin):
 
         # noqa
         """  # noqa: DOC201
-        return EverestOptimizers(config, optimizer_callback)
+        return EverestOptimizers(context, optimizer_callback)
 
     @classmethod
     def is_supported(cls, method: str) -> bool:
