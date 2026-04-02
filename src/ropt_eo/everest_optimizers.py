@@ -20,6 +20,7 @@ from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+    from ropt.config import BackendConfig
     from ropt.context import EnOptContext
     from ropt.core import OptimizerCallback
 
@@ -74,7 +75,22 @@ class EverestOptimizers(Backend):
         "bounds": _CONSTRAINT_REQUIRES_BOUNDS,
     }
 
-    def __init__(
+    def __init__(self, backend_config: BackendConfig) -> None:
+        """Initialize the Everest optimizer backend.
+
+        Args:
+            backend_config: The configuration for the backend, containing the
+                            method name and options.
+        """
+        self._config = backend_config
+        _, _, self._method = backend_config.method.lower().rpartition("/")
+        if self._method == "default":
+            self._method = _DEFAULT_METHOD
+        if self._method not in _SUPPORTED_METHODS:
+            msg = f"OPT++ optimizer algorithm {self._method} is not supported"
+            raise NotImplementedError(msg)
+
+    def init(
         self, context: EnOptContext, optimizer_callback: OptimizerCallback
     ) -> None:
         """Initialize the optimizer implemented by the Optpp plugin.
@@ -85,12 +101,6 @@ class EverestOptimizers(Backend):
         """
         self._optimizer_callback = optimizer_callback
         self._context = context
-        _, _, self._method = self._context.backend.method.lower().rpartition("/")
-        if self._method == "default":
-            self._method = _DEFAULT_METHOD
-        if self._method not in _SUPPORTED_METHODS:
-            msg = f"OPT++ optimizer algorithm {self._method} is not supported"
-            raise NotImplementedError(msg)
         validate_supported_constraints(
             self._context,
             self._method,
@@ -341,16 +351,14 @@ class EverestOptimizers(Backend):
 
     def _parse_options(self) -> dict[str, Any]:
         options = (
-            copy.deepcopy(self._context.backend.options)
-            if isinstance(self._context.backend.options, dict)
+            copy.deepcopy(self._config.options)
+            if isinstance(self._config.options, dict)
             else {}
         )
-        if self._context.backend.max_iterations is not None:
-            options["max_iterations"] = self._context.backend.max_iterations
-        if self._context.backend.convergence_tolerance is not None:
-            options["convergence_tolerance"] = (
-                self._context.backend.convergence_tolerance
-            )
+        if self._config.max_iterations is not None:
+            options["max_iterations"] = self._config.max_iterations
+        if self._config.convergence_tolerance is not None:
+            options["convergence_tolerance"] = self._config.convergence_tolerance
         return options
 
 
@@ -370,16 +378,14 @@ class EverestOptimizersPlugin(BackendPlugin):
     """The OPT++ optimizer plugin class."""
 
     @classmethod
-    def create(
-        cls, context: EnOptContext, optimizer_callback: OptimizerCallback
-    ) -> EverestOptimizers:
+    def create(cls, backend_config: BackendConfig) -> EverestOptimizers:
         """Initialize the optimizer plugin.
 
         See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
         """  # noqa: DOC201
-        return EverestOptimizers(context, optimizer_callback)
+        return EverestOptimizers(backend_config)
 
     @classmethod
     def is_supported(cls, method: str) -> bool:
