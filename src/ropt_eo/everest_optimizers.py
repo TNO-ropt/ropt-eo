@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
 import numpy as np
-from everest_optimizers import minimize  # type: ignore[import-untyped]
+from everest_optimizers import minimize
 from ropt.backend import Backend
 from ropt.backend.utils import (
     NormalizedConstraints,
@@ -127,7 +127,7 @@ class EverestOptimizers(Backend):
         self._constraints = self._initialize_constraints(initial_values)
 
         minimize(
-            fun=self._function,
+            fun=self._function,  # type: ignore[arg-type]
             x0=initial_values[self._context.variables.mask],
             method=_METHOD_MAP[self._method],
             bounds=self._bounds,
@@ -135,6 +135,22 @@ class EverestOptimizers(Backend):
             constraints=self._constraints,
             options=self._options or None,
         )
+
+    def validate_options(self) -> None:
+        """Validate the options of a given method.
+
+        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
+
+        # noqa
+        """  # noqa: DOC501
+        if self._config.options is not None:
+            if not isinstance(self._config.options, dict):
+                msg = "OPT++ optimizer options must be a dictionary"
+                raise ValueError(msg)
+            *_, method = self._method.rpartition("/")
+            OptionsSchemaModel.model_validate(_OPTIONS_SCHEMA).get_options_model(
+                _DEFAULT_METHOD if method == "default" else method
+            ).model_validate(self._config.options)
 
     def _initialize_bounds(self) -> Bounds | None:
         if (
@@ -396,25 +412,6 @@ class EverestOptimizersPlugin(BackendPlugin):
         # noqa
         """  # noqa: DOC201
         return method.lower() in (_SUPPORTED_METHODS | {"default"})
-
-    @classmethod
-    def validate_options(
-        cls, method: str, options: dict[str, Any] | list[str] | None
-    ) -> None:
-        """Validate the options of a given method.
-
-        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
-
-        # noqa
-        """  # noqa: DOC501
-        if options is not None:
-            if not isinstance(options, dict):
-                msg = "OPT++ optimizer options must be a dictionary"
-                raise ValueError(msg)
-            *_, method = method.rpartition("/")
-            OptionsSchemaModel.model_validate(_OPTIONS_SCHEMA).get_options_model(
-                _DEFAULT_METHOD if method == "default" else method
-            ).model_validate(options)
 
 
 _DEFAULT_OPTIONS: dict[str, Any] = {
