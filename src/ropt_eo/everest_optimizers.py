@@ -58,8 +58,7 @@ class EverestOptimizers(Backend):
     options, use the `options` dictionary within the
     [`optimizer`][ropt.config.BackendConfig] section.
 
-    The table below lists the included methods together with the method-specific
-    options that are supported:
+    Below are the supported options:
 
     --8<-- "everest_optimizers.md"
     """
@@ -428,20 +427,31 @@ _DEFAULT_OPTIONS: dict[str, Any] = {
 }
 
 _OPTIONS_SCHEMA: dict[str, Any] = {
+    "common": {
+        "options": {
+            "debug": bool,
+            "output_file": str,
+            "search_method": Literal["line_search", "trust_region", "trust_pds"],
+            "search_pattern_size": int,
+            "max_step": float,
+            "gradient_multiplier": float,
+            "max_iterations": int,
+            "max_function_evaluations": int,
+            "convergence_tolerance": float,
+            "gradient_tolerance": float,
+        }
+    },
     "methods": {
-        "q_newton": {"options": _DEFAULT_OPTIONS},
-        "bcq_newton": {"options": _DEFAULT_OPTIONS},
+        "q_newton": {"options": {}},
+        "bcq_newton": {"options": {}},
         "q_nips": {
-            "options": (
-                _DEFAULT_OPTIONS
-                | {
-                    "merit_function": Literal["el_bakry", "argaez_tapia", "van_shanno"],
-                    "mu": float,
-                    "centering_parameter": float,
-                    "steplength_to_boundary": float,
-                    "constraint_tolerance": float,
-                }
-            )
+            "options": {
+                "merit_function": Literal["el_bakry", "argaez_tapia", "van_shanno"],
+                "mu": float,
+                "centering_parameter": float,
+                "steplength_to_boundary": float,
+                "constraint_tolerance": float,
+            }
         },
     },
 }
