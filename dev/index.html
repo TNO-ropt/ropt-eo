@@ -454,27 +454,29 @@ algorithm's name. Most methods support the general options defined in the
 <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/optimization/configuration/#ropt.context.EnOptContext"><code>EnOptContext</code></a> object. For algorithm-specific
 options, use the <code>options</code> dictionary within the
 <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/optimization/configuration/#ropt.config.BackendConfig"><code>optimizer</code></a> section.</p>
-<p>The table below lists the included methods together with the method-specific
-options that are supported:</p>
+<p>Below are the supported options:</p>
+<p><strong>Common Options:</strong></p>
+<p>debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance</p>
+<p><strong>Method-specific Options:</strong></p>
 <table>
 <thead>
 <tr>
 <th>Method</th>
-<th>Method Options</th>
+<th>Options</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>q_newton:</td>
-<td>debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance</td>
+<td>q_newton</td>
+<td></td>
 </tr>
 <tr>
-<td>bcq_newton:</td>
-<td>debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance</td>
+<td>bcq_newton</td>
+<td></td>
 </tr>
 <tr>
-<td>q_nips:</td>
-<td>debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance, merit_function, mu, centering_parameter, steplength_to_boundary, constraint_tolerance</td>
+<td>q_nips</td>
+<td>merit_function, mu, centering_parameter, steplength_to_boundary, constraint_tolerance</td>
 </tr>
 </tbody>
 </table>
