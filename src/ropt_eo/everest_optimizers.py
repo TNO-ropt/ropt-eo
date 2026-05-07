@@ -427,20 +427,22 @@ _DEFAULT_OPTIONS: dict[str, Any] = {
 }
 
 _OPTIONS_SCHEMA: dict[str, Any] = {
-    "common": {
-        "options": {
-            "debug": bool,
-            "output_file": str,
-            "search_method": Literal["line_search", "trust_region", "trust_pds"],
-            "search_pattern_size": int,
-            "max_step": float,
-            "gradient_multiplier": float,
-            "max_iterations": int,
-            "max_function_evaluations": int,
-            "convergence_tolerance": float,
-            "gradient_tolerance": float,
+    "common": [
+        {
+            "options": {
+                "debug": bool,
+                "output_file": str,
+                "search_method": Literal["line_search", "trust_region", "trust_pds"],
+                "search_pattern_size": int,
+                "max_step": float,
+                "gradient_multiplier": float,
+                "max_iterations": int,
+                "max_function_evaluations": int,
+                "convergence_tolerance": float,
+                "gradient_tolerance": float,
+            }
         }
-    },
+    ],
     "methods": {
         "q_newton": {"options": {}},
         "bcq_newton": {"options": {}},
