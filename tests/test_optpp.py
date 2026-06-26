@@ -156,11 +156,11 @@ def test_optpp_eq_nonlinear_constraint(
         "lower_bounds": 1.0,
         "upper_bounds": 1.0,
     }
-    test_functions = (
-        *test_functions,
-        lambda variables, _: variables[0] + variables[2],
-    )
-    optimizer = BasicOptimizer(config, evaluator(test_functions))
+
+    def constraint_function(variables: NDArray[np.float64], _: Any) -> float:
+        return float(variables[0] + variables[2])
+
+    optimizer = BasicOptimizer(config, evaluator(test_functions, [constraint_function]))
     optimizer.run(initial_values)
     assert optimizer.results is not None
     assert np.allclose(
@@ -184,11 +184,11 @@ def test_optpp_ineq_nonlinear_constraint(
         "upper_bounds": upper_bounds,
     }
     weight = 1.0 if upper_bounds == 0.4 else -1.0
-    test_functions = (
-        *test_functions,
-        lambda variables, _: weight * variables[0] + weight * variables[2],
-    )
-    optimizer = BasicOptimizer(config, evaluator(test_functions))
+
+    def constraint_function(variables: NDArray[np.float64], _: Any) -> float:
+        return weight * float(variables[0] + variables[2])
+
+    optimizer = BasicOptimizer(config, evaluator(test_functions, [constraint_function]))
     optimizer.run(initial_values)
     assert optimizer.results is not None
     assert np.allclose(
@@ -208,13 +208,17 @@ def test_optpp_ineq_nonlinear_constraints_two_sided(
         "lower_bounds": [0.01, 0.0],
         "upper_bounds": [0.01, 0.3],
     }
-    test_functions = (
-        *test_functions,
-        lambda variables, _: variables[1],
-        lambda variables, _: variables[0] + variables[2],
-    )
 
-    optimizer = BasicOptimizer(config, evaluator(test_functions))
+    def constraint_function_1(variables: NDArray[np.float64], _: Any) -> float:
+        return float(variables[1])
+
+    def constraint_function_2(variables: NDArray[np.float64], _: Any) -> float:
+        return float(variables[0] + variables[2])
+
+    optimizer = BasicOptimizer(
+        config,
+        evaluator(test_functions, [constraint_function_1, constraint_function_2]),
+    )
     optimizer.run(initial_values)
     assert optimizer.results is not None
     assert np.allclose(
@@ -234,13 +238,17 @@ def test_optpp_ineq_nonlinear_constraints_eq_ineq(
         "lower_bounds": [0.01, 0.0],
         "upper_bounds": [0.01, 0.3],
     }
-    test_functions = (
-        *test_functions,
-        lambda variables, _: variables[1],
-        lambda variables, _: variables[0] + variables[2],
-    )
 
-    optimizer = BasicOptimizer(config, evaluator(test_functions))
+    def constraint_function_1(variables: NDArray[np.float64], _: Any) -> float:
+        return float(variables[1])
+
+    def constraint_function_2(variables: NDArray[np.float64], _: Any) -> float:
+        return float(variables[0] + variables[2])
+
+    optimizer = BasicOptimizer(
+        config,
+        evaluator(test_functions, [constraint_function_1, constraint_function_2]),
+    )
     optimizer.run(initial_values)
     assert optimizer.results is not None
     assert np.allclose(
