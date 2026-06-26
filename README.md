@@ -14,7 +14,7 @@ information.
 
 
 ## Dependencies
-This code has been tested with Python versions 3.11-3.13.
+This code has been tested with Python versions 3.11-3.14.
 
 The plugin depends on the
 [everest-optimizers](https://github.com/equinor/everest-optimizers) Python
