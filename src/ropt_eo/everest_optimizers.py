@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
     from ropt.config import BackendConfig
     from ropt.context import EnOptContext
     from ropt.core import OptimizerCallback
+
+_logger = logging.getLogger("ropt.backend.eo")
 
 _SUPPORTED_METHODS: Final[set[str]] = {"q_newton", "bcq_newton", "q_nips"}
 _DEFAULT_METHOD: Final = "q_nips"
@@ -110,6 +113,7 @@ class EverestOptimizers(Backend):
         self._cached_variables: NDArray[np.float64] | None = None
         self._cached_function: NDArray[np.float64] | None = None
         self._cached_gradient: NDArray[np.float64] | None = None
+        _logger.debug("Using OPT++ optimizer: %s", self._method)
 
     def start(self, initial_values: NDArray[np.float64]) -> None:
         """Start the optimization.
