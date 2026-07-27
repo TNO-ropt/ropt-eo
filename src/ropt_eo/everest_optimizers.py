@@ -130,7 +130,7 @@ class EverestOptimizers(Backend):
         self._constraints = self._initialize_constraints(initial_values)
 
         minimize(
-            fun=self._function,  # type: ignore[arg-type]
+            fun=self._function,
             x0=initial_values[self._context.variables.mask],
             method=_METHOD_MAP[self._method],
             bounds=self._bounds,
@@ -145,7 +145,7 @@ class EverestOptimizers(Backend):
         See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
-        """  # noqa: DOC501
+        """  # ruff: ignore[docstring-missing-exception]
         if self._config.options is not None:
             if not isinstance(self._config.options, dict):
                 msg = "OPT++ optimizer options must be a dictionary"
@@ -401,7 +401,7 @@ class EverestOptimizersPlugin(BackendPlugin):
         See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
-        """  # noqa: DOC201
+        """  # ruff: ignore[docstring-missing-returns]
         return EverestOptimizers(backend_config)
 
     @classmethod
@@ -411,7 +411,7 @@ class EverestOptimizersPlugin(BackendPlugin):
         See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
 
         # noqa
-        """  # noqa: DOC201
+        """  # ruff: ignore[docstring-missing-returns]
         return method.lower() in (_SUPPORTED_METHODS | {"default"})
 
 
