@@ -130,7 +130,7 @@ class EverestOptimizers(Backend):
         self._constraints = self._initialize_constraints(initial_values)
 
         minimize(
-            fun=self._function,
+            fun=self._function,  # type: ignore[arg-type]
             x0=initial_values[self._context.variables.mask],
             method=_METHOD_MAP[self._method],
             bounds=self._bounds,
