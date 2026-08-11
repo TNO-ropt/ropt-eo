@@ -16,6 +16,7 @@ from ropt.backend.utils import (
     validate_supported_constraints,
 )
 from ropt.config.options import OptionsSchemaModel
+from ropt.exceptions import UnsupportedError
 from ropt.plugins.backend import BackendPlugin
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
@@ -83,14 +84,14 @@ class EverestOptimizers(Backend):
         Args:
             backend_config: The configuration for the backend, containing the
                             method name and options.
-        """
+        """  # ruff: ignore[docstring-missing-exception]
         self._config = backend_config
         _, _, self._method = backend_config.method.lower().rpartition("/")
         if self._method == "default":
             self._method = _DEFAULT_METHOD
         if self._method not in _SUPPORTED_METHODS:
-            msg = f"OPT++ optimizer algorithm {self._method} is not supported"
-            raise NotImplementedError(msg)
+            msg = f"OPT++ optimizer algorithm '{self._method}' is not supported."
+            raise UnsupportedError(msg)
 
     def init(
         self, context: EnOptContext, optimizer_callback: OptimizerCallback
