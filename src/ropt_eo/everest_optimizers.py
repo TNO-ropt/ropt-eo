@@ -192,7 +192,8 @@ class EverestOptimizers(Backend):
                 self._context.nonlinear_constraints.upper_bounds,
             )
         )
-        if (bounds := _get_constraint_bounds(nonlinear_bounds)) is not None:
+        bounds = _get_constraint_bounds(nonlinear_bounds)
+        if bounds is not None:
             self._normalized_constraints = NormalizedConstraints()
             self._normalized_constraints.set_bounds(*bounds)
         return self._initialize_constraints_object(lin_coef, lin_lower, lin_upper)
