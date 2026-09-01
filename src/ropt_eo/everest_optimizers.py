@@ -151,9 +151,8 @@ class EverestOptimizers(Backend):
             if not isinstance(self._config.options, dict):
                 msg = "OPT++ optimizer options must be a dictionary"
                 raise ValueError(msg)
-            *_, method = self._method.rpartition("/")
             OptionsSchemaModel.model_validate(_OPTIONS_SCHEMA).get_options_model(
-                _DEFAULT_METHOD if method == "default" else method
+                self._method
             ).model_validate(self._config.options)
 
     def _initialize_bounds(self) -> Bounds | None:
