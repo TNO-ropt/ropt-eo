@@ -17,7 +17,6 @@ from ropt.backend.utils import (
 )
 from ropt.config.options import OptionsSchemaModel
 from ropt.exceptions import UnsupportedError
-from ropt.plugins.backend import BackendPlugin
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
     from ropt.config import BackendConfig
     from ropt.context import EnOptContext
     from ropt.core import OptimizerCallback
+    from ropt.plugins import MethodSpec
 
 _logger = logging.getLogger("ropt.backend.eo")
 
@@ -66,6 +66,8 @@ class EverestOptimizers(Backend):
 
     --8<-- "everest_optimizers.md"
     """
+
+    methods: ClassVar[MethodSpec] = _SUPPORTED_METHODS | {"default"}
 
     _supported_constraints: ClassVar[dict[str, set[str]]] = {
         "bounds": _CONSTRAINT_SUPPORT_BOUNDS,
@@ -143,7 +145,7 @@ class EverestOptimizers(Backend):
     def validate_options(self) -> None:
         """Validate the options of a given method.
 
-        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
+        See the [ropt.backend.Backend][] abstract base class.
 
         # noqa
         """  # ruff: ignore[docstring-missing-exception]
@@ -390,30 +392,6 @@ def _get_constraint_bounds(
         lower_bounds, upper_bounds = zip(*bounds, strict=True)
         return np.concatenate(lower_bounds), np.concatenate(upper_bounds)
     return None
-
-
-class EverestOptimizersPlugin(BackendPlugin):
-    """The OPT++ optimizer plugin class."""
-
-    @classmethod
-    def create(cls, backend_config: BackendConfig) -> EverestOptimizers:
-        """Initialize the optimizer plugin.
-
-        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
-
-        # noqa
-        """  # ruff: ignore[docstring-missing-returns]
-        return EverestOptimizers(backend_config)
-
-    @classmethod
-    def is_supported(cls, method: str) -> bool:
-        """Check if a method is supported.
-
-        See the [ropt.plugins.backend.BackendPlugin][] abstract base class.
-
-        # noqa
-        """  # ruff: ignore[docstring-missing-returns]
-        return method.lower() in (_SUPPORTED_METHODS | {"default"})
 
 
 _DEFAULT_OPTIONS: dict[str, Any] = {
