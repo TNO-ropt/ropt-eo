@@ -54,6 +54,15 @@ class EverestOptimizers(Backend):
     This class provides an interface to several optimization algorithms from
     the OPT++ library, enabling their use within `ropt`.
 
+    !!! warning "This backend cannot run concurrently in-process"
+        OPT++ always creates an output file under a fixed name in the current
+        working directory, which `everest-optimizers` deletes again once the run
+        has started. Two runs at once in the same process therefore create and
+        delete the same file, and each one's `output_file` is a path they share.
+        To use this backend alongside anything else, prefix the method with
+        `external/` and it runs in a process of its own, through the
+        [`external`][ropt.backend.external.ExternalBackend] backend.
+
     To select an optimizer, set the `method` field within the
     [`optimizer`][ropt.config.BackendConfig] section of the
     [`EnOptContext`][ropt.context.EnOptContext] configuration object to the desired
