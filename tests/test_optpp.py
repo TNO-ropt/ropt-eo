@@ -290,19 +290,20 @@ def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
 def test_optpp_optimizer_variables_subset_linear_constraints(
     config: Any, eval_func: Any
 ) -> None:
-    # Set the second variable a constant value, this will not affect the
-    # optimization of the other variables in this particular test problem: The
-    # second and third constraints are dropped because they involve variables
-    # that are not optimized. They are still checked by the monitor:
+    # Fix the second variable. The second constraint involves only that
+    # variable and is dropped; the third mixes it with a free one and is kept,
+    # with the fixed variable's contribution moved into the bound, so
+    # `x1 + x2 <= 1.6` becomes `x2 <= 0.6`. That binds, which is why the result
+    # is not the [0.25, 0.75] the first constraint alone would give.
     config["backend"]["method"] = "everest_optimizers/q_nips"
     config["linear_constraints"] = {
-        "coefficients": [[1, 0, 1], [0, 1, 0], [1, 1, 1]],
-        "lower_bounds": [1.0, 1.0, 2.0],
-        "upper_bounds": [1.0, 1.0, 2.0],
+        "coefficients": [[1, 0, 1], [0, 1, 0], [0, 1, 1]],
+        "lower_bounds": [1.0, 1.0, -np.inf],
+        "upper_bounds": [1.0, 1.0, 1.6],
     }
     config["variables"]["mask"] = [True, False, True]
     initial = initial_values.copy()
     initial[1] = 1.0
     result = optimize(config, initial, eval_func())
     assert result.variables is not None
-    assert np.allclose(result.variables, [0.25, 1.0, 0.75], atol=0.02)
+    assert np.allclose(result.variables, [0.4, 1.0, 0.6], atol=0.02)
