@@ -11,8 +11,8 @@ import numpy as np
 from everest_optimizers import minimize
 from ropt.backend import Backend
 from ropt.backend.utils import (
-    NormalizedConstraints,
-    get_masked_linear_constraints,
+    get_linear_constraints,
+    get_nonlinear_equalities,
     resolve_verbosity,
     validate_supported_constraints,
 )
@@ -200,71 +200,47 @@ class EverestOptimizers(Backend):
     def _initialize_constraints(
         self, initial_values: NDArray[np.float64]
     ) -> list[NonlinearConstraint | LinearConstraint]:
-        self._normalized_constraints = None
+        self._is_eq = get_nonlinear_equalities(self._context)
 
-        lin_coef, lin_lower, lin_upper = None, None, None
-        self._linear_constraint_bounds: (
-            tuple[NDArray[np.float64], NDArray[np.float64]] | None
-        ) = None
-        if self._context.linear_constraints is not None:
-            lin_coef, lin_lower, lin_upper = get_masked_linear_constraints(
-                self._context, initial_values
-            )
-            self._linear_constraint_bounds = (lin_lower, lin_upper)
-        nonlinear_bounds = (
+        linear = (
             None
-            if self._context.nonlinear_constraints is None
-            else (
-                self._context.nonlinear_constraints.lower_bounds,
-                self._context.nonlinear_constraints.upper_bounds,
-            )
+            if self._context.linear_constraints is None
+            else get_linear_constraints(self._context, initial_values)
         )
-        bounds = _get_constraint_bounds(nonlinear_bounds)
-        if bounds is not None:
-            self._normalized_constraints = NormalizedConstraints()
-            self._normalized_constraints.set_bounds(*bounds)
-        return self._initialize_constraints_object(lin_coef, lin_lower, lin_upper)
+        return self._initialize_constraints_object(linear)
 
     def _fun_object(self, variables: NDArray[np.float64]) -> NDArray[np.float64]:
-        assert self._normalized_constraints is not None
-        self._normalized_constraints.set_constraints(
-            self._constraint_functions(variables).transpose()
-        )
-        assert self._normalized_constraints.constraints is not None
-        return self._normalized_constraints.constraints[:, 0]
+        return self._constraint_functions(variables)
 
     def _jac_object(
         self,
         variables: NDArray[np.float64],
     ) -> NDArray[np.float64]:
-        assert self._normalized_constraints is not None
-        self._normalized_constraints.set_gradients(
-            self._constraint_gradients(variables)
-        )
-        assert self._normalized_constraints.gradients is not None
-        return self._normalized_constraints.gradients
+        return self._constraint_gradients(variables)
 
     def _initialize_constraints_object(
         self,
-        lin_coef: NDArray[np.float64] | None,
-        lin_lower: NDArray[np.float64] | None,
-        lin_upper: NDArray[np.float64] | None,
+        linear: tuple[
+            NDArray[np.float64],
+            NDArray[np.float64],
+            NDArray[np.float64],
+            NDArray[np.bool_],
+        ]
+        | None,
     ) -> list[LinearConstraint | NonlinearConstraint]:
         constraints: list[LinearConstraint | NonlinearConstraint] = []
-        if self._context.linear_constraints is not None:
-            assert lin_coef is not None
-            assert lin_lower is not None
-            assert lin_upper is not None
-            constraints.append(LinearConstraint(lin_coef, lin_lower, lin_upper))
-        if self._normalized_constraints is not None:
-            ub = [
-                0.0 if is_eq else np.inf for is_eq in self._normalized_constraints.is_eq
-            ]
+        if linear is not None:
+            coefficients, lower_bounds, upper_bounds, _ = linear
+            constraints.append(
+                LinearConstraint(coefficients, lower_bounds, upper_bounds)
+            )
+        if self._is_eq is not None and self._is_eq.size > 0:
+            ub = np.where(self._is_eq, 0.0, np.inf)
             constraints.append(
                 NonlinearConstraint(
                     fun=self._fun_object,
                     jac=self._jac_object,
-                    lb=[0.0] * len(ub),
+                    lb=np.zeros_like(ub),
                     ub=ub,
                 ),
             )
@@ -317,8 +293,6 @@ class EverestOptimizers(Backend):
             self._cached_variables = None
             self._cached_function = None
             self._cached_gradient = None
-            if self._normalized_constraints is not None:
-                self._normalized_constraints.reset()
 
         function = self._cached_function if get_function else None
         gradient = self._cached_gradient if get_gradient else None
@@ -384,15 +358,6 @@ class EverestOptimizers(Backend):
             new_function = callback_result.functions
             new_gradient = callback_result.gradients
 
-        # The optimizer callback may change non-linear constraint bounds:
-        if (
-            self._normalized_constraints is not None
-            and callback_result.nonlinear_constraint_bounds is not None
-        ):
-            bounds = _get_constraint_bounds(callback_result.nonlinear_constraint_bounds)
-            assert bounds is not None
-            self._normalized_constraints.set_bounds(*bounds)
-
         return new_function, new_gradient
 
     def _parse_options(self) -> dict[str, Any]:
@@ -409,18 +374,6 @@ class EverestOptimizers(Backend):
         if self._config.convergence_tolerance is not None:
             options["convergence_tolerance"] = self._config.convergence_tolerance
         return options
-
-
-def _get_constraint_bounds(
-    nonlinear_bounds: tuple[NDArray[np.float64], NDArray[np.float64]] | None,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]] | None:
-    bounds = []
-    if nonlinear_bounds is not None:
-        bounds.append(nonlinear_bounds)
-    if bounds:
-        lower_bounds, upper_bounds = zip(*bounds, strict=True)
-        return np.concatenate(lower_bounds), np.concatenate(upper_bounds)
-    return None
 
 
 _DEFAULT_OPTIONS: dict[str, Any] = {
