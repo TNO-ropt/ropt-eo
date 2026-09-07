@@ -13,6 +13,7 @@ from ropt.backend import Backend
 from ropt.backend.utils import (
     NormalizedConstraints,
     get_masked_linear_constraints,
+    resolve_verbosity,
     validate_supported_constraints,
 )
 from ropt.config.options import OptionsSchemaModel
@@ -150,6 +151,22 @@ class EverestOptimizers(Backend):
             constraints=self._constraints,
             options=self._options or None,
         )
+
+    @property
+    def bypasses_python_output(self) -> bool:
+        """Whether the optimizer prints without going through Python.
+
+        OPT++ writes from its C++ implementation, so its output does not pass
+        through `sys.stdout`. It is silent unless the `debug` option is set or
+        `output_file` names a file, but the declaration covers the whole
+        backend, which costs nothing since it cannot run concurrently
+        in-process anyway.
+
+        See the [ropt.backend.Backend][] abstract base class.
+
+        # noqa
+        """
+        return True
 
     def validate_options(self) -> None:
         """Validate the options of a given method.
@@ -384,6 +401,9 @@ class EverestOptimizers(Backend):
             if isinstance(self._config.options, dict)
             else {}
         )
+        # OPT++ is silent by default and offers no reporting levels.
+        level = resolve_verbosity(verbose=self._config.verbose)
+        options.setdefault("debug", level is None or level > 0)
         if self._config.max_iterations is not None:
             options["max_iterations"] = self._config.max_iterations
         if self._config.convergence_tolerance is not None:
