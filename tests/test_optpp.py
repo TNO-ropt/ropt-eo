@@ -269,7 +269,7 @@ def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
         for item in event.results or ():
             if isinstance(item, GradientResults):
                 assert item.gradients is not None
-                assert item.gradients.target_objective[1] == 0.0
+                assert item.target_gradient[1] == 0.0
                 assert np.all(np.equal(item.gradients.objectives[:, 1], 0.0))
 
     result = optimize(
