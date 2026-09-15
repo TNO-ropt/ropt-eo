@@ -10,20 +10,15 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
 import numpy as np
 from everest_optimizers import minimize
 from ropt.backend import Backend
-from ropt.backend.utils import (
-    get_linear_constraints,
-    get_nonlinear_equalities,
-    resolve_verbosity,
-    validate_supported_constraints,
-)
+from ropt.backend.utils import resolve_verbosity
 from ropt.config.options import OptionsSchemaModel
 from ropt.exceptions import UnsupportedError
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
+    from ropt.backend import OptimizationProblem
     from ropt.config import BackendConfig
-    from ropt.context import EnOptContext
     from ropt.core import OptimizerCallback
     from ropt.plugins import MethodSpec
 
@@ -105,46 +100,41 @@ class EverestOptimizers(Backend):
             msg = f"OPT++ optimizer algorithm '{self._method}' is not supported."
             raise UnsupportedError(msg)
 
-    def init(
-        self, context: EnOptContext, optimizer_callback: OptimizerCallback
+    def start(
+        self,
+        problem: OptimizationProblem,
+        optimizer_callback: OptimizerCallback,
+        *,
+        evaluation_policy: Literal["speculative", "separate", "auto"],
+        output_dir: Path | None,  # ruff: ignore[unused-method-argument]
     ) -> None:
-        """Initialize the optimizer implemented by the Optpp plugin.
-
-        See the [ropt.backend.Backend][] abstract base class.
-
-        # noqa
-        """
-        self._optimizer_callback = optimizer_callback
-        self._context = context
-        validate_supported_constraints(
-            self._context,
-            self._method,
-            self._supported_constraints,
-            self._required_constraints,
-        )
-        self._options = self._parse_options()
-        self._cached_variables: NDArray[np.float64] | None = None
-        self._cached_function: NDArray[np.float64] | None = None
-        self._cached_gradient: NDArray[np.float64] | None = None
-        _logger.debug("Using OPT++ optimizer: %s", self._method)
-
-    def start(self, initial_values: NDArray[np.float64]) -> None:
         """Start the optimization.
 
         See the [ropt.backend.Backend][] abstract base class.
 
         # noqa
         """
-        self._cached_variables = None
-        self._cached_function = None
-        self._cached_gradient = None
+        self._problem = problem
+        self._optimizer_callback = optimizer_callback
+        self._evaluation_policy = evaluation_policy
+        problem.validate_supported_constraints(
+            self._method,
+            self._supported_constraints,
+            self._required_constraints,
+        )
+        self._options = self._parse_options()
+        _logger.debug("Using OPT++ optimizer: %s", self._method)
+
+        self._cached_variables: NDArray[np.float64] | None = None
+        self._cached_function: NDArray[np.float64] | None = None
+        self._cached_gradient: NDArray[np.float64] | None = None
 
         self._bounds = self._initialize_bounds()
-        self._constraints = self._initialize_constraints(initial_values)
+        self._constraints = self._initialize_constraints()
 
         minimize(
             fun=self._function,  # type: ignore[arg-type]
-            x0=initial_values[self._context.variables.mask],
+            x0=problem.initial_values,
             method=_METHOD_MAP[self._method],
             bounds=self._bounds,
             jac=self._gradient,
@@ -184,30 +174,17 @@ class EverestOptimizers(Backend):
             ).model_validate(self._config.options)
 
     def _initialize_bounds(self) -> Bounds | None:
-        if (
-            np.isfinite(self._context.variables.lower_bounds).any()
-            or np.isfinite(self._context.variables.upper_bounds).any()
-        ):
-            lower_bounds = self._context.variables.lower_bounds[
-                self._context.variables.mask
-            ]
-            upper_bounds = self._context.variables.upper_bounds[
-                self._context.variables.mask
-            ]
+        lower_bounds = self._problem.lower_bounds
+        upper_bounds = self._problem.upper_bounds
+        if np.isfinite(lower_bounds).any() or np.isfinite(upper_bounds).any():
             return Bounds(lower_bounds, upper_bounds)
         return None
 
     def _initialize_constraints(
-        self, initial_values: NDArray[np.float64]
+        self,
     ) -> list[NonlinearConstraint | LinearConstraint]:
-        self._is_eq = get_nonlinear_equalities(self._context)
-
-        linear = (
-            None
-            if self._context.linear_constraints is None
-            else get_linear_constraints(self._context, initial_values)
-        )
-        return self._initialize_constraints_object(linear)
+        self._is_eq = self._problem.nonlinear_equalities
+        return self._initialize_constraints_object(self._problem.linear_constraints)
 
     def _fun_object(self, variables: NDArray[np.float64]) -> NDArray[np.float64]:
         return self._constraint_functions(variables)
@@ -302,7 +279,7 @@ class EverestOptimizers(Backend):
 
         if compute_functions or compute_gradients:
             self._cached_variables = variables.copy()
-            speculative = self._context.gradient.evaluation_policy == "speculative"
+            speculative = self._evaluation_policy == "speculative"
             compute_functions = compute_functions or speculative
             compute_gradients = compute_gradients or speculative
             new_function, new_gradient = self._compute_functions_and_gradients(
@@ -335,7 +312,7 @@ class EverestOptimizers(Backend):
         if (
             compute_functions
             and compute_gradients
-            and self._context.gradient.evaluation_policy == "separate"
+            and self._evaluation_policy == "separate"
         ):
             callback_result = self._optimizer_callback(
                 variables,
