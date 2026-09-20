@@ -41,8 +41,8 @@ def test_optpp_unconstrained(config: Any, eval_func: Any, external: str) -> None
     config["variables"]["lower_bounds"] = -np.inf
     config["variables"]["upper_bounds"] = np.inf
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.0, 0.0, 0.5], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
 
 
 @pytest.mark.parametrize("method", ["bcq_newton", "q_nips"])
@@ -51,8 +51,8 @@ def test_optpp_bound_constraint(config: Any, method: str, eval_func: Any) -> Non
     config["variables"]["lower_bounds"] = -1.0
     config["variables"]["upper_bounds"] = [1.0, 1.0, 0.2]
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.0, 0.0, 0.2], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.0, 0.0, 0.2], atol=0.02)
 
 
 def test_optpp_eq_linear_constraint(config: Any, eval_func: Any) -> None:
@@ -63,8 +63,8 @@ def test_optpp_eq_linear_constraint(config: Any, eval_func: Any) -> None:
         "upper_bounds": [1.0, 0.75],
     }
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.25, 0.0, 0.75], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.25, 0.0, 0.75], atol=0.02)
 
 
 def test_optpp_ge_linear_constraint(config: Any, eval_func: Any) -> None:
@@ -75,8 +75,8 @@ def test_optpp_ge_linear_constraint(config: Any, eval_func: Any) -> None:
         "upper_bounds": np.inf,
     }
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.05, 0.0, 0.45], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.05, 0.0, 0.45], atol=0.02)
 
 
 def test_optpp_le_linear_constraint(config: Any, eval_func: Any) -> None:
@@ -87,8 +87,8 @@ def test_optpp_le_linear_constraint(config: Any, eval_func: Any) -> None:
         "upper_bounds": 0.4,
     }
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.05, 0.0, 0.45], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.05, 0.0, 0.45], atol=0.02)
 
 
 def test_optpp_le_ge_linear_constraints(config: Any, eval_func: Any) -> None:
@@ -99,8 +99,8 @@ def test_optpp_le_ge_linear_constraints(config: Any, eval_func: Any) -> None:
         "upper_bounds": [0.4, np.inf],
     }
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.05, 0.0, 0.45], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.05, 0.0, 0.45], atol=0.02)
 
 
 def test_optpp_le_ge_linear_constraints_two_sided(config: Any, eval_func: Any) -> None:
@@ -112,8 +112,8 @@ def test_optpp_le_ge_linear_constraints_two_sided(config: Any, eval_func: Any) -
     }
 
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.1, 0.0, 0.4], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.1, 0.0, 0.4], atol=0.02)
 
     config["linear_constraints"] = {
         "coefficients": [[1, 0, 1]],
@@ -122,8 +122,8 @@ def test_optpp_le_ge_linear_constraints_two_sided(config: Any, eval_func: Any) -
     }
 
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.1, 0.0, 0.4], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.1, 0.0, 0.4], atol=0.02)
 
 
 def test_optpp_eq_nonlinear_constraint(
@@ -141,8 +141,8 @@ def test_optpp_eq_nonlinear_constraint(
     result = optimize(
         config, initial_values, eval_func(test_functions, [constraint_function])
     )
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.25, 0.0, 0.75], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.25, 0.0, 0.75], atol=0.02)
 
 
 @pytest.mark.parametrize(
@@ -168,8 +168,8 @@ def test_optpp_ineq_nonlinear_constraint(
     result = optimize(
         config, initial_values, eval_func(test_functions, [constraint_function])
     )
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.05, 0.0, 0.45], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.05, 0.0, 0.45], atol=0.02)
 
 
 def test_optpp_ineq_nonlinear_constraints_two_sided(
@@ -196,8 +196,8 @@ def test_optpp_ineq_nonlinear_constraints_two_sided(
         initial_values,
         eval_func(test_functions, [constraint_function_1, constraint_function_2]),
     )
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.1, 0.01, 0.4], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.1, 0.01, 0.4], atol=0.02)
 
 
 def test_optpp_ineq_nonlinear_constraints_eq_ineq(
@@ -224,8 +224,8 @@ def test_optpp_ineq_nonlinear_constraints_eq_ineq(
         initial_values,
         eval_func(test_functions, [constraint_function_1, constraint_function_2]),
     )
-    assert result.variables is not None
-    assert np.allclose(result.variables, [-0.1, 0.01, 0.4], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [-0.1, 0.01, 0.4], atol=0.02)
 
 
 def test_optpp_failed_realizations(config: Any, eval_func: Any) -> None:
@@ -247,13 +247,13 @@ def test_optpp_evaluation_policy_separate(config: Any, eval_func: Any) -> None:
     config["backend"]["method"] = "everest_optimizers/bcq_newton"
     config["gradient"] = {"evaluation_policy": "separate"}
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.0, 0.0, 0.5], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
 
     config["gradient"] = {"evaluation_policy": "separate"}
     result = optimize(config, initial_values, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.0, 0.0, 0.5], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
 
 
 def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
@@ -284,8 +284,8 @@ def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
             )
         ],
     )
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.0, 0.0, 0.5], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
 
 
 def test_optpp_optimizer_variables_subset_linear_constraints(
@@ -306,5 +306,5 @@ def test_optpp_optimizer_variables_subset_linear_constraints(
     initial = initial_values.copy()
     initial[1] = 1.0
     result = optimize(config, initial, eval_func())
-    assert result.variables is not None
-    assert np.allclose(result.variables, [0.4, 1.0, 0.6], atol=0.02)
+    assert result.results is not None
+    assert np.allclose(result.results.variables, [0.4, 1.0, 0.6], atol=0.02)
