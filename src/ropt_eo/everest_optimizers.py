@@ -60,12 +60,12 @@ class EverestOptimizers(Backend):
         [`external`][ropt.backend.external.ExternalBackend] backend.
 
     To select an optimizer, set the `method` field within the
-    [`optimizer`][ropt.config.BackendConfig] section of the
+    [`backend`][ropt.config.BackendConfig] section of the
     [`EnOptContext`][ropt.context.EnOptContext] configuration object to the desired
     algorithm's name. Most methods support the general options defined in the
     [`EnOptContext`][ropt.context.EnOptContext] object. For algorithm-specific
     options, use the `options` dictionary within the
-    [`optimizer`][ropt.config.BackendConfig] section.
+    [`backend`][ropt.config.BackendConfig] section.
 
     Below are the supported options:
 
