@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, override
 
 import numpy as np
 from everest_optimizers import minimize
@@ -100,13 +100,14 @@ class EverestOptimizers(Backend):
             msg = f"OPT++ optimizer algorithm '{self._method}' is not supported."
             raise UnsupportedError(msg)
 
+    @override
     def start(
         self,
         problem: OptimizationProblem,
         optimizer_callback: OptimizerCallback,
         *,
         evaluation_policy: Literal["speculative", "separate", "auto"],
-        output_dir: Path | None,  # ruff: ignore[unused-method-argument]
+        output_dir: Path | None,
     ) -> None:
         """Start the optimization.
 
@@ -143,6 +144,7 @@ class EverestOptimizers(Backend):
         )
 
     @property
+    @override
     def bypasses_python_output(self) -> bool:
         """Whether the optimizer prints without going through Python.
 
@@ -158,6 +160,7 @@ class EverestOptimizers(Backend):
         """
         return True
 
+    @override
     def validate_options(self) -> None:
         """Validate the options of a given method.
 
