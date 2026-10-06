@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, override
 
 import numpy as np
 from everest_optimizers import minimize
+from ropt import UnsupportedError
 from ropt.backend import Backend
 from ropt.backend.utils import resolve_verbosity
 from ropt.config.options import OptionsSchemaModel
-from ropt.exceptions import UnsupportedError
 from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
