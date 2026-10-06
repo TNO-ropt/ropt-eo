@@ -5,11 +5,7 @@ from typing import Any
 import numpy as np
 import pytest
 from numpy.typing import NDArray
-from ropt.components.event_handlers import CallbackHandler
-from ropt.enums import EnOptEventType, ExitCode
-from ropt.events import EnOptEvent
-from ropt.results import GradientResults
-from ropt.simple import optimize
+from ropt import ExitCode, FunctionResults, GradientResults, optimize
 
 initial_values = [0.0, 0.0, 0.1]
 
@@ -258,24 +254,19 @@ def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
     # values for the other parameters:
     config["variables"]["mask"] = [True, False, True]
 
-    def assert_gradient(event: EnOptEvent) -> None:
-        for item in event.results or ():
-            if isinstance(item, GradientResults):
-                assert item.gradients is not None
-                assert item.target_gradient is not None
-                assert item.target_gradient[1] == 0.0
-                assert np.all(np.equal(item.gradients.objectives[:, 1], 0.0))
+    def assert_gradient(item: FunctionResults | GradientResults) -> None:
+        if isinstance(item, GradientResults):
+            assert item.gradients is not None
+            assert item.target_gradient is not None
+            assert item.target_gradient[1] == 0.0
+            assert np.all(np.equal(item.gradients.objectives[:, 1], 0.0))
 
     result = optimize(
         config,
         initial_values,
         eval_func(),
-        handlers=[
-            CallbackHandler(
-                event_types={EnOptEventType.FINISHED_EVALUATION},
-                callback=assert_gradient,
-            )
-        ],
+        report=assert_gradient,
+        report_gradients=True,
     )
     assert result.results is not None
     assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
