@@ -265,7 +265,7 @@ def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
         config,
         initial_values,
         eval_func(),
-        report=assert_gradient,
+        result_callback=assert_gradient,
         report_gradients=True,
     )
     assert result.results is not None
