@@ -1,4 +1,4 @@
-# ruff: file-ignore[float-equality-comparison]
+# ruff: file-ignore[float-equality-comparison, private-member-access]
 
 from typing import Any
 
@@ -6,8 +6,45 @@ import numpy as np
 import pytest
 from numpy.typing import NDArray
 from ropt import ExitCode, FunctionResults, GradientResults, optimize
+from ropt.backend import OptimizerCallbackResult
+
+from ropt_eo.everest_optimizers import EverestOptimizers
 
 initial_values = [0.0, 0.0, 0.1]
+
+
+def test_optpp_cache_distinguishes_close_points() -> None:
+    backend = EverestOptimizers.__new__(EverestOptimizers)
+    backend._cached_variables = None
+    backend._cached_function = None
+    backend._cached_gradient = None
+    backend._evaluation_policy = "auto"
+    calls: list[float] = []
+
+    def evaluate(
+        variables: NDArray[np.float64],
+        *,
+        return_functions: bool,
+        return_gradients: bool,
+    ) -> OptimizerCallbackResult:
+        assert return_functions
+        assert not return_gradients
+        calls.append(float(variables[0]))
+        return OptimizerCallbackResult(
+            functions=np.array([variables[0], variables[0] + 1]),
+            gradients=None,
+        )
+
+    backend._optimizer_callback = evaluate
+    first = np.array([1.0])
+    second = np.array([1.0 + 1e-9])
+
+    np.testing.assert_array_equal(backend._function(first), [1.0])
+    np.testing.assert_array_equal(
+        backend._constraint_functions(second), [second[0] + 1]
+    )
+    np.testing.assert_array_equal(backend._function(second), [second[0]])
+    assert calls == [first[0], second[0]]
 
 
 @pytest.fixture(name="config")
