@@ -462,9 +462,11 @@ To use this backend alongside anything else, prefix the method with
 <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/context/#ropt.context.EnOptContext"><code>EnOptContext</code></a> configuration object to the desired
 algorithm's name. Most methods support the general options defined in the
 <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/context/#ropt.context.EnOptContext"><code>EnOptContext</code></a> object. For algorithm-specific
-options, use the <code>options</code> dictionary within the
-<a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.BackendConfig"><code>backend</code></a> section.</p>
-<p>Below are the supported options:</p>
+options, use the <code>options</code> field within the
+<a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.BackendConfig"><code>backend</code></a> section. It is either a dictionary
+or a list of strings.</p>
+<p>A dictionary is passed to <code>everest-optimizers</code> unchanged. Below are the
+supported options:</p>
 <p><strong>Common Options:</strong></p>
 <p>debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance</p>
 <p><strong>Method-specific Options:</strong></p>
@@ -490,6 +492,55 @@ options, use the <code>options</code> dictionary within the
 </tr>
 </tbody>
 </table>
+<p>A list of strings uses the format and the keywords of the Dakota
+<a href="https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html"><code>optpp_q_newton</code></a>
+method, for instance <code>["search_method = tr_pds", "max_step 10"]</code>. Each
+string is <code>"name = value"</code> or <code>"name value"</code>. The accepted names are
+<code>search_method</code>, <code>merit_function</code>, <code>steplength_to_boundary</code>,
+<code>centering_parameter</code>, <code>max_step</code>, <code>gradient_tolerance</code>, <code>max_iterations</code>,
+<code>convergence_tolerance</code>, <code>max_function_evaluations</code> and <code>output</code>. The
+strings are checked, converted to the types of the options, and passed on
+as a dictionary, with these translations:</p>
+<table>
+<thead>
+<tr>
+<th>Dakota</th>
+<th>Dictionary</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>search_method value_based_line_search</code></td>
+<td><code>search_method: "line_search"</code></td>
+</tr>
+<tr>
+<td><code>search_method gradient_based_line_search</code></td>
+<td><code>search_method: "line_search"</code></td>
+</tr>
+<tr>
+<td><code>search_method trust_region</code></td>
+<td><code>search_method: "trust_region"</code></td>
+</tr>
+<tr>
+<td><code>search_method tr_pds</code></td>
+<td><code>search_method: "trust_pds"</code></td>
+</tr>
+<tr>
+<td><code>output debug</code></td>
+<td><code>debug: True</code></td>
+</tr>
+<tr>
+<td><code>output</code> with any other level</td>
+<td><code>debug: False</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>everest-optimizers</code> always uses the value-based line search, so
+<code>gradient_based_line_search</code> gives the same result as
+<code>value_based_line_search</code>. Dakota uses <code>merit_function</code>,
+<code>steplength_to_boundary</code> and <code>centering_parameter</code> only in its interior
+point optimizer; likewise, they are passed on for the <code>q_nips</code> method and
+dropped for the other methods.</p>
 
 
 
