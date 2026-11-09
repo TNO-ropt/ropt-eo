@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, override
 
@@ -47,10 +48,12 @@ class EverestOptimizers(Backend):
     [`backend`][ropt.config.BackendConfig] section of the
     [`EnOptContext`][ropt.context.EnOptContext] configuration object to
     `eo/optpp_q_newton` or `eo/default`. For algorithm-specific options, use the
-    `options` dictionary within the [`backend`][ropt.config.BackendConfig]
-    section, keyed by the names of the options of the Dakota
+    `options` field within the [`backend`][ropt.config.BackendConfig]
+    section. It is either a dictionary keyed by option name, or a list of
+    strings in the format of the Dakota
     [`optpp_q_newton`](https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html)
-    method:
+    method, such as `["search_method = trust_region", "max_step 10"]`. Both
+    forms accept the same options:
 
     --8<-- "everest_optimizers.md"
 
@@ -222,14 +225,46 @@ class EverestOptimizers(Backend):
         return level is None or level > 0
 
 
+def _split_option(option: str) -> tuple[str, str | None] | None:
+    text = option.split("#", maxsplit=1)[0].strip()
+    if not text:
+        return None
+    name, *value = re.split(r"\s*=\s*|\s+", text, maxsplit=1)
+    return name, value[0] if value else None
+
+
+def _split_options(options: list[str]) -> list[tuple[str, str | None]]:
+    split = (_split_option(option) for option in options)
+    return [item for item in split if item is not None]
+
+
 def _validate_options(options: dict[str, Any] | list[str] | None) -> dict[str, Any]:
+    flags: set[str] = set()
     if isinstance(options, list):
-        msg = "OPT++ optimizer options must be a dictionary"
-        raise ValueError(msg)  # ruff: ignore[type-check-without-type-error]
+        options, flags = _options_from_strings(options)
     options_model = OptionsSchemaModel.model_validate(
         _OPTIONS_SCHEMA
     ).get_options_model(_METHOD)
-    return options_model.model_validate(options or {}).model_dump(exclude_unset=True)
+    validated = options_model.model_validate(options or {}).model_dump(
+        exclude_unset=True
+    )
+    # Lax validation would turn a bare keyword into a number, such as 1.0.
+    missing = sorted(name for name in flags if validated[name] is not True)
+    if missing:
+        msg = f"Option(s) require a value: {', '.join(f'`{name}`' for name in missing)}"
+        raise ValueError(msg)
+    return validated
+
+
+def _options_from_strings(options: list[str]) -> tuple[dict[str, Any], set[str]]:
+    split = _split_options(options)
+    names = [name for name, _ in split]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        msg = f"Duplicate option(s): {', '.join(f'`{name}`' for name in duplicates)}"
+        raise ValueError(msg)
+    flags = {name for name, value in split if value is None}
+    return {name: True if value is None else value for name, value in split}, flags
 
 
 _OPTIONS_SCHEMA: dict[str, Any] = {

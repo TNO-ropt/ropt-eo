@@ -225,9 +225,33 @@ def test_optpp_unsupported_method_rejected() -> None:
         EverestOptimizers(BackendConfig(method="eo/q_nips"))
 
 
-def test_optpp_list_options_rejected() -> None:
-    with pytest.raises(ValueError, match="options must be a dictionary"):
-        validate_backend_options("eo/optpp_q_newton", ["max_step = 2"])
+def test_optpp_invalid_options(config: Any) -> None:
+    config["backend"]["options"] = [
+        "max_iterations = 0",
+        "merit_function el_bakry",
+    ]
+    validate_backend_options("eo/optpp_q_newton", config["backend"]["options"])
+
+    config["backend"]["options"] = [
+        "max_iterations = 0",
+        "search_method = 1",
+        "merit_function el_bakry",
+    ]
+    with pytest.raises(
+        ValidationError, match=r"Input should be 'value_based_line_search',"
+    ):
+        validate_backend_options("eo/optpp_q_newton", config["backend"]["options"])
+
+    config["backend"]["options"] = [
+        "max_iterations = 0",
+        "foo = xyz",
+        "bar",
+        "merit_function el_bakry",
+    ]
+    with pytest.raises(
+        ValidationError, match=r"Unknown or unsupported option\(s\): `foo`, `bar`"
+    ):
+        validate_backend_options("eo/optpp_q_newton", config["backend"]["options"])
 
 
 def test_optpp_invalid_dict_options() -> None:
@@ -244,24 +268,97 @@ def test_optpp_invalid_dict_options() -> None:
         validate_backend_options("eo/optpp_q_newton", {"debug": True})
 
 
-def test_optpp_tr_pds_rejected() -> None:
+@pytest.mark.parametrize(
+    "options",
+    [{"search_method": "tr_pds"}, ["search_method = tr_pds"]],
+)
+def test_optpp_tr_pds_rejected(options: dict[str, str] | list[str]) -> None:
     with pytest.raises(ValidationError, match="search_method"):
-        validate_backend_options("eo/optpp_q_newton", {"search_method": "tr_pds"})
+        validate_backend_options("eo/optpp_q_newton", options)
 
 
+def test_optpp_string_options_comments_ignored() -> None:
+    validate_backend_options(
+        "eo/optpp_q_newton", ["max_step = 2  # comment", "# only a comment"]
+    )
+
+
+def test_optpp_string_options_converted_to_typed_dict() -> None:
+    options = _parse_options(
+        options=[
+            "max_iterations = 5",
+            "max_function_evaluations 7",
+            "convergence_tolerance=1e-6",
+            "max_step = 2  # comment",
+            "# only a comment",
+            "search_method trust_region",
+            "output_file opt.out",
+        ]
+    )
+    assert options == {
+        "max_iterations": 5,
+        "max_function_evaluations": 7,
+        "convergence_tolerance": 1e-6,
+        "max_step": 2.0,
+        "search_method": "trust_region",
+        "output_file": "opt.out",
+    }
+    assert isinstance(options, dict)
+    assert type(options["max_iterations"]) is int
+    assert type(options["max_step"]) is float
+
+
+def test_optpp_string_options_duplicate_rejected() -> None:
+    with pytest.raises(ValueError, match=r"Duplicate option\(s\): `max_step`"):
+        validate_backend_options("eo/optpp_q_newton", ["max_step 1", "max_step 2"])
+
+
+@pytest.mark.parametrize("option", ["max_step", "max_iterations"])
+def test_optpp_string_options_bare_keyword_requires_value(option: str) -> None:
+    with pytest.raises(ValueError, match=rf"require a value: `{option}`"):
+        validate_backend_options("eo/optpp_q_newton", [option])
+
+
+@pytest.mark.parametrize(
+    "option", ["max_iterations = ten", "output_file", "output = loud"]
+)
+def test_optpp_string_options_invalid_value_rejected(option: str) -> None:
+    with pytest.raises(ValidationError):
+        validate_backend_options("eo/optpp_q_newton", [option])
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"max_step": 2.0, "search_method": "value_based_line_search"},
+        ["max_step = 2", "search_method value_based_line_search"],
+    ],
+)
 def test_optpp_options_passed_as_dict(
-    config: Any, eval_func: Any, minimize_options: list[Any]
+    config: Any, eval_func: Any, minimize_options: list[Any], options: Any
 ) -> None:
     del config["backend"]["convergence_tolerance"]
-    config["backend"]["options"] = {
-        "max_step": 2.0,
-        "search_method": "value_based_line_search",
-    }
+    config["backend"]["options"] = options
     optimize(config, initial_values, eval_func())
     assert minimize_options == [
         {"max_step": 2.0, "search_method": "value_based_line_search"}
     ]
     assert type(minimize_options[0]["max_step"]) is float
+
+
+def test_optpp_string_and_dict_options_equivalent(config: Any, eval_func: Any) -> None:
+    config["variables"]["lower_bounds"] = -1.0
+    config["variables"]["upper_bounds"] = [1.0, 1.0, 0.2]
+    config["backend"]["options"] = {"max_step": 0.5, "search_method": "trust_region"}
+    dict_result = optimize(config, initial_values, eval_func())
+    config["backend"]["options"] = ["max_step = 0.5", "search_method trust_region"]
+    string_result = optimize(config, initial_values, eval_func())
+    assert dict_result.results is not None
+    assert string_result.results is not None
+    assert np.allclose(dict_result.results.variables, [0.0, 0.0, 0.2], atol=0.02)
+    np.testing.assert_array_equal(
+        string_result.results.variables, dict_result.results.variables
+    )
 
 
 def test_optpp_config_overrides_dict_options() -> None:
@@ -277,22 +374,39 @@ def test_optpp_config_overrides_dict_options() -> None:
     }
 
 
+def test_optpp_config_overrides_string_options() -> None:
+    options = _parse_options(
+        options=["max_iterations = 5", "convergence_tolerance 0.1", "max_step 2"],
+        max_iterations=10,
+        convergence_tolerance=1e-6,
+    )
+    assert options == {
+        "max_iterations": 10,
+        "convergence_tolerance": 1e-6,
+        "max_step": 2.0,
+    }
+
+
 @pytest.mark.parametrize(
     ("verbose", "output"), [(None, None), (False, None), (0, None), (True, "debug")]
 )
 def test_optpp_verbose_sets_output(verbose: Any, output: str | None) -> None:
-    options = _parse_options(options={}, verbose=verbose)
-    assert options == ({} if output is None else {"output": output})
+    dict_options = _parse_options(options={}, verbose=verbose)
+    assert dict_options == ({} if output is None else {"output": output})
+    string_options = _parse_options(options=[], verbose=verbose)
+    assert string_options == dict_options
 
 
 def test_optpp_verbose_keeps_output_option() -> None:
     assert _parse_options(options={"output": "quiet"}, verbose=True) == {
         "output": "quiet"
     }
+    assert _parse_options(options=["output quiet"], verbose=True) == {"output": "quiet"}
 
 
 def test_optpp_speculative_policy_sets_speculative() -> None:
     assert _parse_options("speculative", options={}) == {"speculative": True}
+    assert _parse_options("speculative", options=[]) == {"speculative": True}
     assert _parse_options("separate", options={}) == {}
 
 
