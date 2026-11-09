@@ -1,8 +1,8 @@
 # An `everest-optimizers` optimizer plugin for `ropt`
 This package installs a plugin for the
 [`ropt`](https://github.com/TNO-ropt/ropt) robust optimization package,
-providing access to algorithms provided by the `everest-optimizers` optimization
-package.
+providing the Dakota-compatible `optpp_q_newton` method from the
+`everest-optimizers` package.
 
 `ropt-eo` is developed by the Netherlands Organisation for Applied Scientific
 Research (TNO). All files in this repository are released under the GNU General
@@ -18,7 +18,7 @@ This code has been tested with Python versions 3.12-3.14.
 
 The plugin depends on the
 [everest-optimizers](https://github.com/equinor/everest-optimizers) Python
-wrappers of various optimization algorithms.
+package and uses its NumPy-based `minimize` interface.
 
 
 ## Installation

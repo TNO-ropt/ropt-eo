@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import copy
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, override
 
 import numpy as np
-from everest_optimizers import minimize
+from everest_optimizers import EvaluationMode, minimize
 from ropt import UnsupportedError
 from ropt.backend import Backend
 from ropt.backend.utils import resolve_verbosity
 from ropt.config.options import OptionsSchemaModel
-from scipy.optimize import Bounds, LinearConstraint, NonlinearConstraint
 
 if TYPE_CHECKING:
+    from everest_optimizers import EvaluationResult
     from numpy.typing import NDArray
     from ropt.backend import OptimizationProblem, OptimizerCallback
     from ropt.config import BackendConfig
@@ -23,31 +22,17 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger("ropt.backend.eo")
 
-_SUPPORTED_METHODS: Final[set[str]] = {"q_newton", "bcq_newton", "q_nips"}
-_DEFAULT_METHOD: Final = "q_nips"
-
-
-# Categorize the methods by the types of constraint they support or require.
-
-_CONSTRAINT_REQUIRES_BOUNDS: Final = {"bcq_newton", "q_nips"}
-_CONSTRAINT_SUPPORT_BOUNDS: Final = {"bcq_newton", "q_nips"}
-_CONSTRAINT_SUPPORT_LINEAR_EQ: Final = {"q_nips"}
-_CONSTRAINT_SUPPORT_LINEAR_INEQ: Final = {"q_nips"}
-_CONSTRAINT_SUPPORT_NONLINEAR_EQ: Final = {"q_nips"}
-_CONSTRAINT_SUPPORT_NONLINEAR_INEQ: Final = {"q_nips"}
-
-_METHOD_MAP: Final = {
-    "q_newton": "optpp_q_newton",
-    "bcq_newton": "optpp_bcq_newton",
-    "q_nips": "optpp_q_nips",
-}
+_METHOD: Final = "optpp_q_newton"
 
 
 class EverestOptimizers(Backend):
     """OPT++ optimization backend for ropt.
 
-    This class provides an interface to several optimization algorithms from
-    the OPT++ library, enabling their use within `ropt`.
+    This class provides the `optpp_q_newton` method of `everest-optimizers`, a
+    replacement for the Dakota method of the same name. Like Dakota, it runs
+    an interior-point method if there are linear or nonlinear constraints, a
+    bound-constrained quasi-Newton method if there are finite bounds, and an
+    unconstrained quasi-Newton method otherwise.
 
     !!! warning "This backend cannot run concurrently in-process"
         OPT++ always creates an output file under a fixed name in the current
@@ -58,31 +43,35 @@ class EverestOptimizers(Backend):
         `external/` and it runs in a process of its own, through the
         [`external`][ropt.backend.external.ExternalBackend] backend.
 
-    To select an optimizer, set the `method` field within the
+    To select the optimizer, set the `method` field within the
     [`backend`][ropt.config.BackendConfig] section of the
-    [`EnOptContext`][ropt.context.EnOptContext] configuration object to the desired
-    algorithm's name. Most methods support the general options defined in the
-    [`EnOptContext`][ropt.context.EnOptContext] object. For algorithm-specific
-    options, use the `options` dictionary within the
-    [`backend`][ropt.config.BackendConfig] section.
-
-    Below are the supported options:
+    [`EnOptContext`][ropt.context.EnOptContext] configuration object to
+    `eo/optpp_q_newton` or `eo/default`. For algorithm-specific options, use the
+    `options` dictionary within the [`backend`][ropt.config.BackendConfig]
+    section, keyed by the names of the options of the Dakota
+    [`optpp_q_newton`](https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html)
+    method:
 
     --8<-- "everest_optimizers.md"
+
+    The `tr_pds` search method is not supported.
+
+    The `output_file` option is not a Dakota option: it names the file that
+    receives the OPT++ output.
+
+    Some fields of the [`backend`][ropt.config.BackendConfig] section set
+    options as well:
+
+    - `max_iterations` and `convergence_tolerance` replace the options of the
+      same name.
+    - `verbose` adds `output debug`, unless the options contain an `output`
+      keyword. OPT++ is silent at all other `output` levels.
+    - An `evaluation_policy` of `speculative` in the
+      [`gradient`][ropt.config.GradientConfig] section adds the Dakota
+      `speculative` keyword.
     """
 
-    methods: ClassVar[MethodSpec] = _SUPPORTED_METHODS | {"default"}
-
-    _supported_constraints: ClassVar[dict[str, set[str]]] = {
-        "bounds": _CONSTRAINT_SUPPORT_BOUNDS,
-        "linear:eq": _CONSTRAINT_SUPPORT_LINEAR_EQ,
-        "linear:ineq": _CONSTRAINT_SUPPORT_LINEAR_INEQ,
-        "nonlinear:eq": _CONSTRAINT_SUPPORT_NONLINEAR_EQ,
-        "nonlinear:ineq": _CONSTRAINT_SUPPORT_NONLINEAR_INEQ,
-    }
-    _required_constraints: ClassVar[dict[str, set[str]]] = {
-        "bounds": _CONSTRAINT_REQUIRES_BOUNDS,
-    }
+    methods: ClassVar[MethodSpec] = {_METHOD, "default"}
 
     def __init__(self, backend_config: BackendConfig) -> None:
         """Initialize the Everest optimizer backend.
@@ -92,12 +81,18 @@ class EverestOptimizers(Backend):
                             method name and options.
         """  # ruff: ignore[docstring-missing-exception]
         self._config = backend_config
-        _, _, self._method = backend_config.method.lower().rpartition("/")
-        if self._method == "default":
-            self._method = _DEFAULT_METHOD
-        if self._method not in _SUPPORTED_METHODS:
-            msg = f"OPT++ optimizer algorithm '{self._method}' is not supported."
+        _, _, method = backend_config.method.lower().rpartition("/")
+        if method not in {_METHOD, "default"}:
+            msg = f"OPT++ optimizer algorithm '{method}' is not supported."
             raise UnsupportedError(msg)
+        self._cache: (
+            tuple[
+                NDArray[np.float64],
+                NDArray[np.float64] | None,
+                NDArray[np.float64] | None,
+            ]
+            | None
+        ) = None
 
     @override
     def start(
@@ -114,32 +109,20 @@ class EverestOptimizers(Backend):
 
         # noqa
         """
-        self._problem = problem
         self._optimizer_callback = optimizer_callback
         self._evaluation_policy = evaluation_policy
-        problem.validate_supported_constraints(
-            self._method,
-            self._supported_constraints,
-            self._required_constraints,
-        )
-        self._options = self._parse_options()
-        _logger.debug("Using OPT++ optimizer: %s", self._method)
-
-        self._cached_variables: NDArray[np.float64] | None = None
-        self._cached_function: NDArray[np.float64] | None = None
-        self._cached_gradient: NDArray[np.float64] | None = None
-
-        self._bounds = self._initialize_bounds()
-        self._constraints = self._initialize_constraints()
+        self._cache = None
+        options = self._parse_options()
+        linear = problem.linear_constraints
+        _logger.debug("Using OPT++ optimizer: %s", _METHOD)
 
         minimize(
-            fun=self._function,  # type: ignore[arg-type]
-            x0=problem.initial_values,
-            method=_METHOD_MAP[self._method],
-            bounds=self._bounds,
-            jac=self._gradient,
-            constraints=self._constraints,
-            options=self._options or None,
+            problem.initial_values,
+            evaluate=self._evaluate,
+            bounds=(problem.lower_bounds, problem.upper_bounds),
+            linear_constraints=None if linear is None else linear[:3],
+            nonlinear_equalities=problem.nonlinear_equalities,
+            options=options or None,
         )
 
     @property
@@ -148,9 +131,9 @@ class EverestOptimizers(Backend):
         """Whether the optimizer prints without going through Python.
 
         OPT++ writes from its C++ implementation, so its output does not pass
-        through `sys.stdout`. It is silent unless the `debug` option is set or
-        `output_file` names a file, but the declaration covers the whole
-        backend, which costs nothing since it cannot run concurrently
+        through `sys.stdout`. It is silent unless the `output` option is
+        `debug` or `output_file` names a file, but the declaration covers the
+        whole backend, which costs nothing since it cannot run concurrently
         in-process anyway.
 
         See the [ropt.backend.Backend][] abstract base class.
@@ -166,236 +149,110 @@ class EverestOptimizers(Backend):
         See the [ropt.backend.Backend][] abstract base class.
 
         # noqa
-        """  # ruff: ignore[docstring-missing-exception]
-        if self._config.options is not None:
-            if not isinstance(self._config.options, dict):
-                msg = "OPT++ optimizer options must be a dictionary"
-                raise ValueError(msg)
-            OptionsSchemaModel.model_validate(_OPTIONS_SCHEMA).get_options_model(
-                self._method
-            ).model_validate(self._config.options)
+        """
+        _validate_options(self._config.options)
 
-    def _initialize_bounds(self) -> Bounds | None:
-        lower_bounds = self._problem.lower_bounds
-        upper_bounds = self._problem.upper_bounds
-        if np.isfinite(lower_bounds).any() or np.isfinite(upper_bounds).any():
-            return Bounds(lower_bounds, upper_bounds)
-        return None
-
-    def _initialize_constraints(
-        self,
-    ) -> list[NonlinearConstraint | LinearConstraint]:
-        self._is_eq = self._problem.nonlinear_equalities
-        return self._initialize_constraints_object(self._problem.linear_constraints)
-
-    def _fun_object(self, variables: NDArray[np.float64]) -> NDArray[np.float64]:
-        return self._constraint_functions(variables)
-
-    def _jac_object(
-        self,
-        variables: NDArray[np.float64],
-    ) -> NDArray[np.float64]:
-        return self._constraint_gradients(variables)
-
-    def _initialize_constraints_object(
-        self,
-        linear: tuple[
-            NDArray[np.float64],
-            NDArray[np.float64],
-            NDArray[np.float64],
-            NDArray[np.bool_],
-        ]
-        | None,
-    ) -> list[LinearConstraint | NonlinearConstraint]:
-        constraints: list[LinearConstraint | NonlinearConstraint] = []
-        if linear is not None:
-            coefficients, lower_bounds, upper_bounds, _ = linear
-            constraints.append(
-                LinearConstraint(coefficients, lower_bounds, upper_bounds)
-            )
-        if self._is_eq is not None and self._is_eq.size > 0:
-            ub = np.where(self._is_eq, 0.0, np.inf)
-            constraints.append(
-                NonlinearConstraint(
-                    fun=self._fun_object,
-                    jac=self._jac_object,
-                    lb=np.zeros_like(ub),
-                    ub=ub,
-                ),
-            )
-        return constraints
-
-    def _function(self, variables: NDArray[np.float64]) -> NDArray[np.float64]:
-        if variables.ndim > 1 and variables.size == 0:
-            return np.array([])
-        functions, _ = self._get_function_or_gradient(
-            variables, get_function=True, get_gradient=False
+    def _evaluate(
+        self, variables: NDArray[np.float64], mode: EvaluationMode
+    ) -> EvaluationResult:
+        # OPT++ may request a point again, and the gradients of ropt are
+        # stochastic, so a repeated request must not reach ropt.
+        cache = self._cache
+        if cache is None or not np.array_equal(variables, cache[0]):
+            cache = (variables.copy(), None, None)
+        _, functions, gradients = cache
+        missing = mode
+        if functions is not None:
+            missing &= ~EvaluationMode.VALUES
+        if gradients is not None:
+            missing &= ~EvaluationMode.GRADIENTS
+        if missing:
+            new_functions, new_gradients = self._request(variables, missing)
+            functions = functions if new_functions is None else new_functions
+            gradients = gradients if new_gradients is None else new_gradients
+        self._cache = (cache[0], functions, gradients)
+        return (
+            functions if mode & EvaluationMode.VALUES else None,
+            gradients if mode & EvaluationMode.GRADIENTS else None,
         )
-        assert functions is not None
-        if variables.ndim > 1:
-            return functions[:, 0]
-        return np.array(functions[0])
 
-    def _gradient(self, variables: NDArray[np.float64]) -> NDArray[np.float64]:
-        _, gradients = self._get_function_or_gradient(
-            variables, get_function=False, get_gradient=True
-        )
-        assert gradients is not None
-        return gradients[0, :]
-
-    def _constraint_functions(
-        self, variables: NDArray[np.float64]
-    ) -> NDArray[np.float64]:
-        functions, _ = self._get_function_or_gradient(
-            variables, get_function=True, get_gradient=False
-        )
-        assert functions is not None
-        return np.array(functions[1:])
-
-    def _constraint_gradients(
-        self, variables: NDArray[np.float64]
-    ) -> NDArray[np.float64]:
-        _, gradients = self._get_function_or_gradient(
-            variables, get_function=False, get_gradient=True
-        )
-        assert gradients is not None
-        return gradients[1:, :]
-
-    def _get_function_or_gradient(
-        self, variables: NDArray[np.float64], *, get_function: bool, get_gradient: bool
-    ) -> tuple[NDArray[np.float64] | None, NDArray[np.float64] | None]:
+    def _request(
+        self, variables: NDArray[np.float64], mode: EvaluationMode
+    ) -> EvaluationResult:
+        return_functions = bool(mode & EvaluationMode.VALUES)
+        return_gradients = bool(mode & EvaluationMode.GRADIENTS)
         if (
-            self._cached_variables is None
-            or variables.shape != self._cached_variables.shape
-            or not np.array_equal(variables, self._cached_variables)
-        ):
-            self._cached_variables = None
-            self._cached_function = None
-            self._cached_gradient = None
-
-        function = self._cached_function if get_function else None
-        gradient = self._cached_gradient if get_gradient else None
-
-        compute_functions = get_function and function is None
-        compute_gradients = get_gradient and gradient is None
-
-        if compute_functions or compute_gradients:
-            self._cached_variables = variables.copy()
-            speculative = self._evaluation_policy == "speculative"
-            compute_functions = compute_functions or speculative
-            compute_gradients = compute_gradients or speculative
-            new_function, new_gradient = self._compute_functions_and_gradients(
-                variables,
-                compute_functions=compute_functions,
-                compute_gradients=compute_gradients,
-            )
-            if compute_functions:
-                assert new_function is not None
-                self._cached_function = new_function.copy()
-                if get_function:
-                    function = new_function
-            if compute_gradients:
-                assert new_gradient is not None
-                self._cached_gradient = new_gradient.copy()
-                if get_gradient:
-                    gradient = new_gradient
-
-        return function, gradient
-
-    def _compute_functions_and_gradients(
-        self,
-        variables: NDArray[np.float64],
-        *,
-        compute_functions: bool,
-        compute_gradients: bool,
-    ) -> tuple[NDArray[np.float64] | None, NDArray[np.float64] | None]:
-        new_function = None
-        new_gradient = None
-        if (
-            compute_functions
-            and compute_gradients
+            return_functions
+            and return_gradients
             and self._evaluation_policy == "separate"
         ):
-            callback_result = self._optimizer_callback(
-                variables,
-                return_functions=True,
-                return_gradients=False,
-            )
-            new_function = callback_result.functions
-            callback_result = self._optimizer_callback(
-                variables,
-                return_functions=False,
-                return_gradients=True,
-            )
-            new_gradient = callback_result.gradients
-        else:
-            callback_result = self._optimizer_callback(
-                variables,
-                return_functions=compute_functions,
-                return_gradients=compute_gradients,
-            )
-            new_function = callback_result.functions
-            new_gradient = callback_result.gradients
-
-        return new_function, new_gradient
+            functions = self._optimizer_callback(
+                variables, return_functions=True, return_gradients=False
+            ).functions
+            gradients = self._optimizer_callback(
+                variables, return_functions=False, return_gradients=True
+            ).gradients
+            return functions, gradients
+        result = self._optimizer_callback(
+            variables,
+            return_functions=return_functions,
+            return_gradients=return_gradients,
+        )
+        return result.functions, result.gradients
 
     def _parse_options(self) -> dict[str, Any]:
-        options = (
-            copy.deepcopy(self._config.options)
-            if isinstance(self._config.options, dict)
-            else {}
-        )
+        parsed = _validate_options(self._config.options)
+        if "output" not in parsed and self._is_verbose():
+            parsed["output"] = "debug"
+        return parsed | self._get_overrides()
+
+    def _get_overrides(self) -> dict[str, Any]:
+        overrides: dict[str, Any] = {}
+        if self._config.max_iterations is not None:
+            overrides["max_iterations"] = self._config.max_iterations
+        if self._config.convergence_tolerance is not None:
+            overrides["convergence_tolerance"] = self._config.convergence_tolerance
+        if self._evaluation_policy == "speculative":
+            overrides["speculative"] = True
+        return overrides
+
+    def _is_verbose(self) -> bool:
         # OPT++ is silent by default and offers no reporting levels.
         level = resolve_verbosity(verbose=self._config.verbose)
-        options.setdefault("debug", level is None or level > 0)
-        if self._config.max_iterations is not None:
-            options["max_iterations"] = self._config.max_iterations
-        if self._config.convergence_tolerance is not None:
-            options["convergence_tolerance"] = self._config.convergence_tolerance
-        return options
+        return level is None or level > 0
 
 
-_DEFAULT_OPTIONS: dict[str, Any] = {
-    "debug": bool,
-    "output_file": str,
-    "search_method": Literal["line_search", "trust_region", "trust_pds"],
-    "search_pattern_size": int,
-    "max_step": float,
-    "gradient_multiplier": float,
-    "max_iterations": int,
-    "max_function_evaluations": int,
-    "convergence_tolerance": float,
-    "gradient_tolerance": float,
-}
+def _validate_options(options: dict[str, Any] | list[str] | None) -> dict[str, Any]:
+    if isinstance(options, list):
+        msg = "OPT++ optimizer options must be a dictionary"
+        raise ValueError(msg)  # ruff: ignore[type-check-without-type-error]
+    options_model = OptionsSchemaModel.model_validate(
+        _OPTIONS_SCHEMA
+    ).get_options_model(_METHOD)
+    return options_model.model_validate(options or {}).model_dump(exclude_unset=True)
+
 
 _OPTIONS_SCHEMA: dict[str, Any] = {
-    "common": [
-        {
-            "options": {
-                "debug": bool,
-                "output_file": str,
-                "search_method": Literal["line_search", "trust_region", "trust_pds"],
-                "search_pattern_size": int,
-                "max_step": float,
-                "gradient_multiplier": float,
-                "max_iterations": int,
-                "max_function_evaluations": int,
-                "convergence_tolerance": float,
-                "gradient_tolerance": float,
-            }
-        }
-    ],
     "methods": {
-        "q_newton": {"options": {}},
-        "bcq_newton": {"options": {}},
-        "q_nips": {
+        _METHOD: {
             "options": {
+                "search_method": Literal[
+                    "value_based_line_search",
+                    "gradient_based_line_search",
+                    "trust_region",
+                ],
                 "merit_function": Literal["el_bakry", "argaez_tapia", "van_shanno"],
-                "mu": float,
-                "centering_parameter": float,
                 "steplength_to_boundary": float,
-                "constraint_tolerance": float,
-            }
+                "centering_parameter": float,
+                "max_step": float,
+                "gradient_tolerance": float,
+                "max_iterations": int,
+                "convergence_tolerance": float,
+                "max_function_evaluations": int,
+                "output": Literal["silent", "quiet", "normal", "verbose", "debug"],
+                "output_file": str,
+            },
+            "url": "https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html",
         },
     },
 }

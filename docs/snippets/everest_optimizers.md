@@ -1,12 +1,6 @@
-**Common Options:**
-
-debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance
-
 
 **Method-specific Options:**
 
 | Method | Options |
 |--------|---------|
-|q_newton||
-|bcq_newton||
-|q_nips|merit_function, mu, centering_parameter, steplength_to_boundary, constraint_tolerance|
+|[optpp_q_newton](https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html)|search_method, merit_function, steplength_to_boundary, centering_parameter, max_step, gradient_tolerance, max_iterations, convergence_tolerance, max_function_evaluations, output, output_file|
