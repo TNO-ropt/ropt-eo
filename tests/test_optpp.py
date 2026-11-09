@@ -119,43 +119,6 @@ def test_optpp_evaluator_separate_policy_splits_requests() -> None:
     np.testing.assert_array_equal(gradients, np.ones((2, 1)))
 
 
-def test_optpp_evaluator_repeated_point_reuses_result() -> None:
-    calls: list[tuple[bool, bool]] = []
-    backend = _evaluator_backend("auto", calls)
-
-    first = backend._evaluate(np.array([3.0]), EvaluationMode.BOTH)
-    second = backend._evaluate(np.array([3.0]), EvaluationMode.BOTH)
-
-    assert calls == [(True, True)]
-    np.testing.assert_array_equal(second[0], first[0])
-    np.testing.assert_array_equal(second[1], first[1])
-
-
-def test_optpp_evaluator_repeated_point_requests_missing_part() -> None:
-    calls: list[tuple[bool, bool]] = []
-    backend = _evaluator_backend("auto", calls)
-
-    backend._evaluate(np.array([3.0]), EvaluationMode.VALUES)
-    functions, gradients = backend._evaluate(np.array([3.0]), EvaluationMode.BOTH)
-
-    assert calls == [(True, False), (False, True)]
-    np.testing.assert_array_equal(functions, [3.0, 2.0])
-    np.testing.assert_array_equal(gradients, np.ones((2, 1)))
-
-
-def test_optpp_evaluator_close_point_evaluated() -> None:
-    calls: list[tuple[bool, bool]] = []
-    backend = _evaluator_backend("auto", calls)
-    close = np.nextafter(3.0, 4.0)
-
-    backend._evaluate(np.array([3.0]), EvaluationMode.VALUES)
-    functions, _ = backend._evaluate(np.array([close]), EvaluationMode.VALUES)
-
-    assert calls == [(True, False), (True, False)]
-    assert functions is not None
-    assert functions[0] == close
-
-
 @pytest.mark.parametrize("constrained", [False, True])
 def test_optpp_numpy_problem_forwarded(
     config: dict[str, Any],

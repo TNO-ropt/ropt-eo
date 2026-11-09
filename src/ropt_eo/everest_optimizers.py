@@ -7,7 +7,6 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, override
 
-import numpy as np
 from everest_optimizers import EvaluationMode, minimize
 from ropt import UnsupportedError
 from ropt.backend import Backend
@@ -15,6 +14,7 @@ from ropt.backend.utils import resolve_verbosity
 from ropt.config.options import OptionsSchemaModel
 
 if TYPE_CHECKING:
+    import numpy as np
     from everest_optimizers import EvaluationResult
     from numpy.typing import NDArray
     from ropt.backend import OptimizationProblem, OptimizerCallback
@@ -33,7 +33,7 @@ class EverestOptimizers(Backend):
     replacement for the Dakota method of the same name. Like Dakota, it runs
     an interior-point method if there are linear or nonlinear constraints, a
     bound-constrained quasi-Newton method if there are finite bounds, and an
-    unconstrained quasi-Newton method otherwise.
+    unconstrained quasi-Newton or limited-memory BFGS method otherwise.
 
     !!! warning "This backend cannot run concurrently in-process"
         OPT++ always creates an output file under a fixed name in the current
@@ -88,14 +88,6 @@ class EverestOptimizers(Backend):
         if method not in {_METHOD, "default"}:
             msg = f"OPT++ optimizer algorithm '{method}' is not supported."
             raise UnsupportedError(msg)
-        self._cache: (
-            tuple[
-                NDArray[np.float64],
-                NDArray[np.float64] | None,
-                NDArray[np.float64] | None,
-            ]
-            | None
-        ) = None
 
     @override
     def start(
@@ -114,7 +106,6 @@ class EverestOptimizers(Backend):
         """
         self._optimizer_callback = optimizer_callback
         self._evaluation_policy = evaluation_policy
-        self._cache = None
         options = self._parse_options()
         linear = problem.linear_constraints
         _logger.debug("Using OPT++ optimizer: %s", _METHOD)
@@ -156,30 +147,6 @@ class EverestOptimizers(Backend):
         _validate_options(self._config.options)
 
     def _evaluate(
-        self, variables: NDArray[np.float64], mode: EvaluationMode
-    ) -> EvaluationResult:
-        # OPT++ may request a point again, and the gradients of ropt are
-        # stochastic, so a repeated request must not reach ropt.
-        cache = self._cache
-        if cache is None or not np.array_equal(variables, cache[0]):
-            cache = (variables.copy(), None, None)
-        _, functions, gradients = cache
-        missing = mode
-        if functions is not None:
-            missing &= ~EvaluationMode.VALUES
-        if gradients is not None:
-            missing &= ~EvaluationMode.GRADIENTS
-        if missing:
-            new_functions, new_gradients = self._request(variables, missing)
-            functions = functions if new_functions is None else new_functions
-            gradients = gradients if new_gradients is None else new_gradients
-        self._cache = (cache[0], functions, gradients)
-        return (
-            functions if mode & EvaluationMode.VALUES else None,
-            gradients if mode & EvaluationMode.GRADIENTS else None,
-        )
-
-    def _request(
         self, variables: NDArray[np.float64], mode: EvaluationMode
     ) -> EvaluationResult:
         return_functions = bool(mode & EvaluationMode.VALUES)
