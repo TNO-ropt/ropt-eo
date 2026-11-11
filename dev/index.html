@@ -419,11 +419,11 @@
 
 <h1 id="an-everest-optimizers-plugin-for-ropt">An <code>everest-optimizers</code> plugin for <code>ropt</code></h1>
 <p>The <code>ropt-eo</code> package extends the <a href="https://tno-ropt.github.io/ropt/dev/"><code>ropt</code></a>
-module by providing a plugin that integrates optimization algorithms from the
+module by providing the Dakota-compatible <code>optpp_q_newton</code> method from the
 <code>everest-optimizers</code> package. <code>ropt</code> itself is a robust optimization framework
 designed for both continuous and discrete optimization workflows and is
-extensible through its plugin architecture. Installing <code>ropt-eo</code> makes its
-algorithms directly available within <code>ropt</code>.</p>
+extensible through its plugin architecture. Installing <code>ropt-eo</code> makes this
+method available as <code>eo/optpp_q_newton</code> within <code>ropt</code>.</p>
 <h2 id="reference">Reference</h2>
 
 
@@ -445,8 +445,11 @@ algorithms directly available within <code>ropt</code>.</p>
 
 
         <p>OPT++ optimization backend for ropt.</p>
-<p>This class provides an interface to several optimization algorithms from
-the OPT++ library, enabling their use within <code>ropt</code>.</p>
+<p>This class provides the <code>optpp_q_newton</code> method of <code>everest-optimizers</code>, a
+replacement for the Dakota method of the same name. Like Dakota, it runs
+an interior-point method if there are linear or nonlinear constraints, a
+bound-constrained quasi-Newton method if there are finite bounds, and an
+unconstrained quasi-Newton or limited-memory BFGS method otherwise.</p>
 <div class="admonition warning">
 <p class="admonition-title">This backend cannot run concurrently in-process</p>
 <p>OPT++ always creates an output file under a fixed name in the current
@@ -457,18 +460,16 @@ To use this backend alongside anything else, prefix the method with
 <code>external/</code> and it runs in a process of its own, through the
 <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/backend/#ropt.backend.external.ExternalBackend"><code>external</code></a> backend.</p>
 </div>
-<p>To select an optimizer, set the <code>method</code> field within the
+<p>To select the optimizer, set the <code>method</code> field within the
 <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.BackendConfig"><code>backend</code></a> section of the
-<a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/context/#ropt.context.EnOptContext"><code>EnOptContext</code></a> configuration object to the desired
-algorithm's name. Most methods support the general options defined in the
-<a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/context/#ropt.context.EnOptContext"><code>EnOptContext</code></a> object. For algorithm-specific
-options, use the <code>options</code> field within the
-<a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.BackendConfig"><code>backend</code></a> section. It is either a dictionary
-or a list of strings.</p>
-<p>A dictionary is passed to <code>everest-optimizers</code> unchanged. Below are the
-supported options:</p>
-<p><strong>Common Options:</strong></p>
-<p>debug, output_file, search_method, search_pattern_size, max_step, gradient_multiplier, max_iterations, max_function_evaluations, convergence_tolerance, gradient_tolerance</p>
+<a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/context/#ropt.context.EnOptContext"><code>EnOptContext</code></a> configuration object to
+<code>eo/optpp_q_newton</code> or <code>eo/default</code>. For algorithm-specific options, use the
+<code>options</code> field within the <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.BackendConfig"><code>backend</code></a>
+section. It is either a dictionary keyed by option name, or a list of
+strings in the format of the Dakota
+<a href="https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html"><code>optpp_q_newton</code></a>
+method, such as <code>["search_method = trust_region", "max_step 10"]</code>. Both
+forms accept the same options:</p>
 <p><strong>Method-specific Options:</strong></p>
 <table>
 <thead>
@@ -479,68 +480,25 @@ supported options:</p>
 </thead>
 <tbody>
 <tr>
-<td>q_newton</td>
-<td></td>
-</tr>
-<tr>
-<td>bcq_newton</td>
-<td></td>
-</tr>
-<tr>
-<td>q_nips</td>
-<td>merit_function, mu, centering_parameter, steplength_to_boundary, constraint_tolerance</td>
+<td><a href="https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html">optpp_q_newton</a></td>
+<td>search_method, merit_function, steplength_to_boundary, centering_parameter, max_step, gradient_tolerance, max_iterations, convergence_tolerance, max_function_evaluations, output, output_file</td>
 </tr>
 </tbody>
 </table>
-<p>A list of strings uses the format and the keywords of the Dakota
-<a href="https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html"><code>optpp_q_newton</code></a>
-method, for instance <code>["search_method = tr_pds", "max_step 10"]</code>. Each
-string is <code>"name = value"</code> or <code>"name value"</code>. The accepted names are
-<code>search_method</code>, <code>merit_function</code>, <code>steplength_to_boundary</code>,
-<code>centering_parameter</code>, <code>max_step</code>, <code>gradient_tolerance</code>, <code>max_iterations</code>,
-<code>convergence_tolerance</code>, <code>max_function_evaluations</code> and <code>output</code>. The
-strings are checked, converted to the types of the options, and passed on
-as a dictionary, with these translations:</p>
-<table>
-<thead>
-<tr>
-<th>Dakota</th>
-<th>Dictionary</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>search_method value_based_line_search</code></td>
-<td><code>search_method: "line_search"</code></td>
-</tr>
-<tr>
-<td><code>search_method gradient_based_line_search</code></td>
-<td><code>search_method: "line_search"</code></td>
-</tr>
-<tr>
-<td><code>search_method trust_region</code></td>
-<td><code>search_method: "trust_region"</code></td>
-</tr>
-<tr>
-<td><code>search_method tr_pds</code></td>
-<td><code>search_method: "trust_pds"</code></td>
-</tr>
-<tr>
-<td><code>output debug</code></td>
-<td><code>debug: True</code></td>
-</tr>
-<tr>
-<td><code>output</code> with any other level</td>
-<td><code>debug: False</code></td>
-</tr>
-</tbody>
-</table>
-<p><code>everest-optimizers</code> always uses the value-based line search, so
-<code>gradient_based_line_search</code> gives the same result as
-<code>value_based_line_search</code>. Dakota uses <code>merit_function</code>,
-<code>steplength_to_boundary</code> and <code>centering_parameter</code> only in its interior
-point optimizer; likewise, they are passed on for the <code>q_nips</code> method and
-dropped for the other methods.</p>
+<p>The <code>tr_pds</code> search method is not supported.</p>
+<p>The <code>output_file</code> option is not a Dakota option: it names the file that
+receives the OPT++ output.</p>
+<p>Some fields of the <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.BackendConfig"><code>backend</code></a> section set
+options as well:</p>
+<ul>
+<li><code>max_iterations</code> and <code>convergence_tolerance</code> replace the options of the
+  same name.</li>
+<li><code>verbose</code> adds <code>output debug</code>, unless the options contain an <code>output</code>
+  keyword. OPT++ is silent at all other <code>output</code> levels.</li>
+<li>An <code>evaluation_policy</code> of <code>speculative</code> in the
+  <a class="autorefs autorefs-external" href="https://tno-ropt.github.io/ropt/latest/reference/config/#ropt.config.GradientConfig"><code>gradient</code></a> section adds the Dakota
+  <code>speculative</code> keyword.</li>
+</ul>
 
 
 
