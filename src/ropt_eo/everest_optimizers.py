@@ -22,31 +22,37 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger("ropt.backend.eo")
 
-_METHOD: Final = "optpp_q_newton"
+_METHOD: Final = "optpp_q_newton2"
 
 
 class EverestOptimizers(Backend):
     """OPT++ optimization backend for ropt.
 
     This class provides the `optpp_q_newton` method of `everest-optimizers`, a
-    replacement for the Dakota method of the same name. Like Dakota, it runs
-    an interior-point method if there are linear or nonlinear constraints, a
-    bound-constrained quasi-Newton method if there are finite bounds, and an
-    unconstrained quasi-Newton or limited-memory BFGS method otherwise.
+    replacement for the Dakota method of the same name, under the name
+    `optpp_q_newton2`. Like Dakota, it runs an interior-point method if there
+    are linear or nonlinear constraints, a bound-constrained quasi-Newton method
+    if there are finite bounds, and an unconstrained quasi-Newton or
+    limited-memory BFGS method otherwise.
 
     !!! warning "This backend cannot run concurrently in-process"
-        OPT++ always creates an output file under a fixed name in the current
-        working directory, which `everest-optimizers` deletes again once the run
-        has started. Two runs at once in the same process therefore create and
-        delete the same file, and each one's `output_file` is a path they share.
-        To use this backend alongside anything else, prefix the method with
-        `external/` and it runs in a process of its own, through the
+        OPT++ stores line-search state in static variables shared by all runs
+        in a process. Concurrent or nested runs that use this line search can
+        overwrite each other's state and produce incorrect results without an
+        error. To isolate the optimizer state, prefix the method with
+        `external/`: each optimization then runs in a process of its own,
+        through the
         [`external`][ropt.backend.external.ExternalBackend] backend.
+
+        Separate processes still share the working directory. OPT++ creates
+        `OPT_DEFAULT.out` there, and `everest-optimizers` may delete it when
+        configuring a run. Runs using the same `output_file` path also write to
+        the same file.
 
     To select the optimizer, set the `method` field within the
     [`backend`][ropt.config.BackendConfig] section of the
     [`EnOptContext`][ropt.context.EnOptContext] configuration object to
-    `eo/optpp_q_newton` or `eo/default`. For algorithm-specific options, use the
+    `eo/optpp_q_newton2` or `eo/default`. For algorithm-specific options, use the
     `options` field within the [`backend`][ropt.config.BackendConfig]
     section. It is either a dictionary keyed by option name, or a list of
     strings in the format of the Dakota

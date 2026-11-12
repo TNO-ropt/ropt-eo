@@ -2,7 +2,7 @@
 This package installs a plugin for the
 [`ropt`](https://github.com/TNO-ropt/ropt) robust optimization package,
 providing the Dakota-compatible `optpp_q_newton` method from the
-`everest-optimizers` package.
+`everest-optimizers` package, under the name `optpp_q_newton2`.
 
 `ropt-eo` is developed by the Netherlands Organisation for Applied Scientific
 Research (TNO). All files in this repository are released under the GNU General
