@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Final, Literal, override
 from everest_optimizers import EvaluationMode, minimize
 from ropt import UnsupportedError
 from ropt.backend import Backend
-from ropt.backend.utils import resolve_verbosity
 from ropt.config.options import OptionsSchemaModel
 
 if TYPE_CHECKING:
@@ -59,16 +58,16 @@ class EverestOptimizers(Backend):
 
     The `tr_pds` search method is not supported.
 
-    The `output_file` option is not a Dakota option: it names the file that
-    receives the OPT++ output.
+    If `output_dir` is set, OPT++ writes its report to
+    `output_dir/optpp_q_newton.txt`. Otherwise, the report is discarded. OPT++
+    prints debug information only if `output` is `debug`. The `verbose` field
+    has no effect.
 
     Some fields of the [`backend`][ropt.config.BackendConfig] section set
     options as well:
 
     - `max_iterations` and `convergence_tolerance` replace the options of the
       same name.
-    - `verbose` adds `output debug`, unless the options contain an `output`
-      keyword. OPT++ is silent at all other `output` levels.
     - An `evaluation_policy` of `speculative` in the
       [`gradient`][ropt.config.GradientConfig] section adds the Dakota
       `speculative` keyword.
@@ -109,6 +108,10 @@ class EverestOptimizers(Backend):
         options = self._parse_options()
         linear = problem.linear_constraints
         _logger.debug("Using OPT++ optimizer: %s", _METHOD)
+        output_file: Path | None = None
+        if output_dir is not None:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_file = output_dir / "optpp_q_newton.txt"
 
         minimize(
             problem.initial_values,
@@ -116,6 +119,7 @@ class EverestOptimizers(Backend):
             bounds=(problem.lower_bounds, problem.upper_bounds),
             linear_constraints=None if linear is None else linear[:3],
             nonlinear_equalities=problem.nonlinear_equalities,
+            output_file=output_file,
             options=options or None,
         )
 
@@ -125,10 +129,10 @@ class EverestOptimizers(Backend):
         """Whether the optimizer prints without going through Python.
 
         OPT++ writes from its C++ implementation, so its output does not pass
-        through `sys.stdout`. It is silent unless the `output` option is
-        `debug` or `output_file` names a file, but the declaration covers the
-        whole backend, which costs nothing since it cannot run concurrently
-        in-process anyway.
+        through `sys.stdout`. The `output` option can print debug information,
+        and `output_dir` causes a report file to be written. The declaration
+        covers the whole backend, which costs nothing since it cannot run
+        concurrently in-process anyway.
 
         See the [ropt.backend.Backend][] abstract base class.
 
@@ -171,10 +175,7 @@ class EverestOptimizers(Backend):
         return result.functions, result.gradients
 
     def _parse_options(self) -> dict[str, Any]:
-        parsed = _validate_options(self._config.options)
-        if "output" not in parsed and self._is_verbose():
-            parsed["output"] = "debug"
-        return parsed | self._get_overrides()
+        return _validate_options(self._config.options) | self._get_overrides()
 
     def _get_overrides(self) -> dict[str, Any]:
         overrides: dict[str, Any] = {}
@@ -185,11 +186,6 @@ class EverestOptimizers(Backend):
         if self._evaluation_policy == "speculative":
             overrides["speculative"] = True
         return overrides
-
-    def _is_verbose(self) -> bool:
-        # OPT++ is silent by default and offers no reporting levels.
-        level = resolve_verbosity(verbose=self._config.verbose)
-        return level is None or level > 0
 
 
 def _split_option(option: str) -> tuple[str, str | None] | None:
@@ -252,7 +248,6 @@ _OPTIONS_SCHEMA: dict[str, Any] = {
                 "convergence_tolerance": float,
                 "max_function_evaluations": int,
                 "output": Literal["silent", "quiet", "normal", "verbose", "debug"],
-                "output_file": str,
             },
             "url": "https://snl-dakota.github.io/docs/latest_release/users/usingdakota/reference/method-optpp_q_newton.html",
         },
