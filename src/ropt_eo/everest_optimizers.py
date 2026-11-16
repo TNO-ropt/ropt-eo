@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 _logger = logging.getLogger("ropt.backend.eo")
 
-_METHOD: Final = "optpp_q_newton"
+_METHOD: Final = "optpp_q_newton2"
 
 
 class EverestOptimizers(Backend):

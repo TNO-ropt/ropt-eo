@@ -36,7 +36,7 @@ def config_fixture() -> dict[str, Any]:
             "perturbation_magnitudes": 0.01,
         },
         "backend": {
-            "method": "eo/optpp_q_newton",
+            "method": "eo/optpp_q_newton2",
             "convergence_tolerance": 1e-6,
         },
         "objectives": {
@@ -60,7 +60,7 @@ def minimize_options_fixture(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
 
 def _parse_options(evaluation_policy: str = "auto", **config: Any) -> dict[str, Any]:
     backend = EverestOptimizers(
-        BackendConfig.model_validate({"method": "eo/optpp_q_newton"} | config)
+        BackendConfig.model_validate({"method": "eo/optpp_q_newton2"} | config)
     )
     backend._evaluation_policy = evaluation_policy  # type: ignore[assignment]
     return backend._parse_options()
@@ -69,7 +69,7 @@ def _parse_options(evaluation_policy: str = "auto", **config: Any) -> dict[str, 
 def _evaluator_backend(
     evaluation_policy: str, calls: list[tuple[bool, bool]]
 ) -> EverestOptimizers:
-    backend = EverestOptimizers(BackendConfig(method="eo/optpp_q_newton"))
+    backend = EverestOptimizers(BackendConfig(method="eo/optpp_q_newton2"))
     backend._evaluation_policy = evaluation_policy  # type: ignore[assignment]
 
     def callback(
@@ -186,9 +186,10 @@ def test_optpp_numpy_problem_forwarded(
     assert len(minimize_calls) == 1
 
 
-def test_optpp_unsupported_method_rejected() -> None:
-    with pytest.raises(UnsupportedError, match="'q_nips' is not supported"):
-        EverestOptimizers(BackendConfig(method="eo/q_nips"))
+@pytest.mark.parametrize("method", ["q_nips", "optpp_q_newton"])
+def test_optpp_unsupported_method_rejected(method: str) -> None:
+    with pytest.raises(UnsupportedError, match=f"'{method}' is not supported"):
+        EverestOptimizers(BackendConfig(method=f"eo/{method}"))
 
 
 def test_optpp_invalid_options(config: Any) -> None:
@@ -196,7 +197,7 @@ def test_optpp_invalid_options(config: Any) -> None:
         "max_iterations = 0",
         "merit_function el_bakry",
     ]
-    validate_backend_options("eo/optpp_q_newton", config["backend"]["options"])
+    validate_backend_options("eo/optpp_q_newton2", config["backend"]["options"])
 
     config["backend"]["options"] = [
         "max_iterations = 0",
@@ -206,7 +207,7 @@ def test_optpp_invalid_options(config: Any) -> None:
     with pytest.raises(
         ValidationError, match=r"Input should be 'value_based_line_search',"
     ):
-        validate_backend_options("eo/optpp_q_newton", config["backend"]["options"])
+        validate_backend_options("eo/optpp_q_newton2", config["backend"]["options"])
 
     config["backend"]["options"] = [
         "max_iterations = 0",
@@ -217,21 +218,21 @@ def test_optpp_invalid_options(config: Any) -> None:
     with pytest.raises(
         ValidationError, match=r"Unknown or unsupported option\(s\): `foo`, `bar`"
     ):
-        validate_backend_options("eo/optpp_q_newton", config["backend"]["options"])
+        validate_backend_options("eo/optpp_q_newton2", config["backend"]["options"])
 
 
 def test_optpp_invalid_dict_options() -> None:
     validate_backend_options(
-        "eo/optpp_q_newton", {"max_iterations": 0, "merit_function": "el_bakry"}
+        "eo/optpp_q_newton2", {"max_iterations": 0, "merit_function": "el_bakry"}
     )
     with pytest.raises(
         ValidationError, match=r"Input should be 'value_based_line_search',"
     ):
-        validate_backend_options("eo/optpp_q_newton", {"search_method": 1})
+        validate_backend_options("eo/optpp_q_newton2", {"search_method": 1})
     with pytest.raises(
         ValidationError, match=r"Unknown or unsupported option\(s\): `debug`"
     ):
-        validate_backend_options("eo/optpp_q_newton", {"debug": True})
+        validate_backend_options("eo/optpp_q_newton2", {"debug": True})
 
 
 @pytest.mark.parametrize(
@@ -240,12 +241,12 @@ def test_optpp_invalid_dict_options() -> None:
 )
 def test_optpp_tr_pds_rejected(options: dict[str, str] | list[str]) -> None:
     with pytest.raises(ValidationError, match="search_method"):
-        validate_backend_options("eo/optpp_q_newton", options)
+        validate_backend_options("eo/optpp_q_newton2", options)
 
 
 def test_optpp_string_options_comments_ignored() -> None:
     validate_backend_options(
-        "eo/optpp_q_newton", ["max_step = 2  # comment", "# only a comment"]
+        "eo/optpp_q_newton2", ["max_step = 2  # comment", "# only a comment"]
     )
 
 
@@ -274,13 +275,13 @@ def test_optpp_string_options_converted_to_typed_dict() -> None:
 
 def test_optpp_string_options_duplicate_rejected() -> None:
     with pytest.raises(ValueError, match=r"Duplicate option\(s\): `max_step`"):
-        validate_backend_options("eo/optpp_q_newton", ["max_step 1", "max_step 2"])
+        validate_backend_options("eo/optpp_q_newton2", ["max_step 1", "max_step 2"])
 
 
 @pytest.mark.parametrize("option", ["max_step", "max_iterations"])
 def test_optpp_string_options_bare_keyword_requires_value(option: str) -> None:
     with pytest.raises(ValueError, match=rf"require a value: `{option}`"):
-        validate_backend_options("eo/optpp_q_newton", [option])
+        validate_backend_options("eo/optpp_q_newton2", [option])
 
 
 @pytest.mark.parametrize(
@@ -288,7 +289,7 @@ def test_optpp_string_options_bare_keyword_requires_value(option: str) -> None:
 )
 def test_optpp_string_options_invalid_value_rejected(option: str) -> None:
     with pytest.raises(ValidationError):
-        validate_backend_options("eo/optpp_q_newton", [option])
+        validate_backend_options("eo/optpp_q_newton2", [option])
 
 
 @pytest.mark.parametrize(
@@ -374,7 +375,7 @@ def test_optpp_speculative_policy_sets_speculative() -> None:
     "external", ["", pytest.param("external/", marks=pytest.mark.external)]
 )
 def test_optpp_unconstrained(config: Any, eval_func: Any, external: str) -> None:
-    config["backend"]["method"] = f"{external}eo/optpp_q_newton"
+    config["backend"]["method"] = f"{external}eo/optpp_q_newton2"
     result = optimize(config, initial_values, eval_func())
     assert result.results is not None
     assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
