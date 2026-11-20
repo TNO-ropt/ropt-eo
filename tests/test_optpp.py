@@ -615,7 +615,7 @@ def test_optpp_failed_realizations(config: Any, eval_func: Any) -> None:
 def test_optpp_evaluation_policy(
     config: Any, eval_func: Any, evaluation_policy: str
 ) -> None:
-    config["gradient"] = {"evaluation_policy": evaluation_policy}
+    config["optimizer"] = {"evaluation_policy": evaluation_policy}
     result = optimize(config, initial_values, eval_func())
     assert result.results is not None
     assert np.allclose(result.results.variables, [0.0, 0.0, 0.5], atol=0.02)
@@ -634,7 +634,7 @@ def test_optpp_speculative_policy_requests_both(
         return original_evaluate(self, variables, mode)
 
     monkeypatch.setattr(EverestOptimizers, "_evaluate", record_evaluate)
-    config["gradient"] = {"evaluation_policy": "speculative"}
+    config["optimizer"] = {"evaluation_policy": "speculative"}
     optimize(config, initial_values, eval_func())
 
     assert modes
@@ -651,10 +651,10 @@ def test_optpp_optimizer_variables_subset(config: Any, eval_func: Any) -> None:
 
     def assert_gradient(item: FunctionResults | GradientResults) -> None:
         if isinstance(item, GradientResults):
-            assert item.gradients is not None
-            assert item.target_gradient is not None
-            assert item.target_gradient[1] == 0.0
-            assert np.all(np.equal(item.gradients.objectives[:, 1], 0.0))
+            assert item.aggregates is not None
+            assert item.target_objective is not None
+            assert item.target_objective[1] == 0.0
+            assert np.all(np.equal(item.aggregates.objectives[:, 1], 0.0))
 
     result = optimize(
         config,

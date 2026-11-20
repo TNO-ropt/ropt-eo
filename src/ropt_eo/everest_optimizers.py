@@ -82,7 +82,7 @@ class EverestOptimizers(Backend):
     - `max_iterations` and `convergence_tolerance` replace the options of the
       same name.
     - An `evaluation_policy` of `speculative` in the
-      [`gradient`][ropt.config.GradientConfig] section adds the Dakota
+      [`optimizer`][ropt.config.OptimizerConfig] section adds the Dakota
       `speculative` keyword.
 
     During an optimization, `everest-optimizers` stores evaluations by point.
